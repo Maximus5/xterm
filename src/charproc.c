@@ -1,4 +1,4 @@
-/* $XTermId: charproc.c,v 1.1487 2017/06/12 01:01:20 tom Exp $ */
+/* $XTermId: charproc.c,v 1.1492 2017/06/19 08:34:54 tom Exp $ */
 
 /*
  * Copyright 1999-2016,2017 by Thomas E. Dickey
@@ -746,8 +746,8 @@ static XtResource xterm_resources[] =
     Bres(XtNvt100Graphics, XtCVT100Graphics, screen.vt100_graphics, True),
     Bres(XtNwideChars, XtCWideChars, screen.wide_chars, False),
     Ires(XtNcombiningChars, XtCCombiningChars, screen.max_combining, 2),
-    Ires(XtNmkSamplePass, XtCMkSamplePass, misc.mk_samplepass, 256),
-    Ires(XtNmkSampleSize, XtCMkSampleSize, misc.mk_samplesize, 1024),
+    Ires(XtNmkSamplePass, XtCMkSamplePass, misc.mk_samplepass, 655),
+    Ires(XtNmkSampleSize, XtCMkSampleSize, misc.mk_samplesize, 65536),
     Sres(XtNutf8, XtCUtf8, screen.utf8_mode_s, "default"),
     Sres(XtNutf8Fonts, XtCUtf8Fonts, screen.utf8_fonts_s, "default"),
     Sres(XtNwideBoldFont, XtCWideBoldFont, misc.default_font.f_wb, DEFWIDEBOLDFONT),
@@ -2874,6 +2874,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 			if_OPT_ISO_COLORS(screen, {
 			    break;
 			});
+			/* FALLTHRU */
 		    default:
 			TRACE(("...unexpected subparameter in SGR\n"));
 			op = 9999;
@@ -3696,6 +3697,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 			    break;
 			}
 			break;
+# if OPT_REGIS_GRAPHICS
 		    case 3:	/* ReGIS geometry */
 			switch (GetParam(1)) {
 			case 1:	/* read */
@@ -3717,6 +3719,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 			    break;
 			}
 			break;
+#endif
 		    default:
 			TRACE(("DATA_ERROR: CASE_GRAPHICS_ATTRIBUTES request with unknown item parameter: %d\n",
 			       GetParam(0)));
@@ -8559,6 +8562,7 @@ VTInitialize(Widget wrequest,
 	TRACE(("setting utf8_mode to 0\n"));
 	screen->utf8_mode = uFalse;
     }
+    mk_wcwidth_init(screen->utf8_mode);
     TRACE(("initialized UTF-8 mode to %d\n", screen->utf8_mode));
 
 #if OPT_MINI_LUIT
@@ -10352,10 +10356,16 @@ ShowCursor(void)
 		}
 	    }
 	}
-	if (T_COLOR(screen, TEXT_CURSOR) == bg_pix ||
-	    T_COLOR(screen, TEXT_CURSOR) == (reversed
-					     ? xw->dft_background
-					     : xw->dft_foreground)) {
+
+#define CUR_XX T_COLOR(screen, TEXT_CURSOR)
+#define CGS_FG getCgsFore(xw, currentWin, getCgsGC(xw, currentWin, currentCgs))
+#define CGS_BG getCgsBack(xw, currentWin, getCgsGC(xw, currentWin, currentCgs))
+
+#define FIX_311 (CUR_XX == (reversed ? xw->dft_background : xw->dft_foreground))
+#define FIX_328 (CUR_XX == bg_pix)
+#define FIX_330 (FIX_328 && reversed && in_selection)
+
+	if (FIX_330 || FIX_311) {
 	    setCgsBack(xw, currentWin, currentCgs, fg_pix);
 	}
 	setCgsFore(xw, currentWin, currentCgs, bg_pix);
@@ -10432,10 +10442,7 @@ ShowCursor(void)
 	     * Set up a new request.
 	     */
 	    if (filled) {
-		if (T_COLOR(screen, TEXT_CURSOR) == bg_pix ||
-		    T_COLOR(screen, TEXT_CURSOR) == (reversed
-						     ? xw->dft_background
-						     : xw->dft_foreground)) {
+		if (FIX_330 || FIX_311) {
 		    setCgsBack(xw, currentWin, currentCgs, fg_pix);
 		}
 		setCgsFore(xw, currentWin, currentCgs, bg_pix);
@@ -10571,7 +10578,7 @@ HideCursor(void)
     int cursor_col;
     CLineData *ld = 0;
 #if OPT_WIDE_ATTRS
-    CgsEnum which_Cgs = gcMAX;
+    int which_Cgs = gcMAX;
     unsigned attr_flags;
     int which_font = fNorm;
 #endif
@@ -10663,7 +10670,7 @@ HideCursor(void)
 	which_Cgs = reverseCgs(xw, attr_flags, in_selection, which_font);
 	if (which_Cgs != gcMAX) {
 	    setCgsFont(xw, WhichVWin(screen),
-		       which_Cgs,
+		       (CgsEnum) which_Cgs,
 		       (((attr_flags & ATR_ITALIC) && UseItalicFont(screen))
 			? getItalicFont(screen, which_font)
 			: getNormalFont(screen, which_font)));
@@ -10707,7 +10714,7 @@ HideCursor(void)
 #if OPT_WIDE_ATTRS
     if (which_Cgs != gcMAX) {
 	setCgsFont(xw, WhichVWin(screen),
-		   which_Cgs,
+		   (CgsEnum) which_Cgs,
 		   (((xw->flags & ATR_ITALIC) && UseItalicFont(screen))
 		    ? getItalicFont(screen, which_font)
 		    : getNormalFont(screen, which_font)));

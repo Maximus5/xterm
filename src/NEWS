@@ -1,44 +1,38 @@
 The NEWS file was generated from xterm.log.html, which serves as the changelog
 for xterm.
 --------------------------------------------------------------------------------
-                            Patch #329 - 2017/06/12
+                            Patch #330 - 2017/06/20
 
-     * add  control  sequences  for  reading  the Sixel and ReGIS graphics
-       sizes (suggested by Ben Wong).
-     * add  a  workaround  for  wcwidth  returning -1 for characters which
-       should have been printable (FreeBSD #219800).
-     * fix a bug in font initialization from patch #328 (FreeBSD #219800).
-     * fix  a special case in HideCursor which assigned a bold font to the
-       slot  used  for  normal  font  in changes for italics in patch #307
-       (Debian #858304).
      * updates for ReGIS (Ross Combs):
-          + Strings  specified  with  no  command  are used as "comments".
-            Print these in the log when tracing.
-          + Catch  attempts  to use "alternate display" mode (AKA "blink")
-            from the GIGI, but do not implement it.
-          + The  T(M)  command  should only multiply the height by 10, not
-            20.
-          + Make  the  S(E)  command reset more state than just the screen
-            contents.
-          + Remove two rotation variables which were only being printed.
-          + Numerous minor fixes and comment updates in the R command.
-          + Unknown R command option names trigger an empty response.
-          + Fix  the  output  position after printing rotated text (it was
-            missing the the sign before).
-          + Fix  the  position  change  with pixelvectors and rotated text
-            (the rotation transform was not being applied).
-          + Update  the TODO list and remove a verification FIXME (slanted
-            text positioning is correct as is).
-          + Emulate  the  approximately  1.4x  enlargement  for text which
-            isn't rotated at right angles.
-          + Only  update the color planes specified in the plane mask (the
-            W command's F option).
-     * fix  a  bug  introduced by the changes to font information in patch
-       #328.   When  processing  the  "checkfont"  option  of  the  locale
-       resource,  the  program  referred  to the request data, to an array
-       which  was  only  allocated  in  the new/result widget (report by H
-       Merijn Brand).
-     * fix  a  missing assignment initialization to make the utf8 resource
-       control  whether  escape sequences to enable/disable UTF-8 mode are
-       allowed.
+          + remove redundant text command error check which broke T(B) and
+            T(E).
+          + retain  the  loading  alphabet  number across multiple “L”
+            commands.
+          + add S(T) delay handler.
+          + fix some color handling error messages.
+          + add stubbed-out macrograph handling.
+          + use  fragment_remaining()  and  fragment_consumed() instead of
+            manually checking position / length in various places.
+          + rename  some  local  variables  in  string  /  extent / option
+            parsing
+          + wrap some long lines.
+          + move macrograph command handling out of the top-level.
+     * add a summary of the italic fonts loaded to -report-fonts option.
+     * modify the font-lookup for italics to allow for “-i-” if no match
+       is found with slant “-o-” (prompted by patch by Ben Wong).
+     * change  default values for mkSamplePass and mkSampleSize to reflect
+       generally-improved  locale  support  in  various  operating systems
+       (FreeBSD #219800).
+     * modify  wcwidth.c to return -1 for non-Unicode values, and adjust a
+       couple  of blocks to better match assumptions about ambiguous-width
+       characters  in  other  implementations.  Also  modify  wcwidth.c to
+       support  configurable soft-hyphen, so there is no drawback to using
+       this version rather than a system wcwidth.
+     * amend  change  made  in  patch #328 for cursor-visibility to handle
+       case  where  an  application  is  updating  the reverse-video state
+       (FreeBSD #219800).
+     * update  tables  of  combining  and  ambiguous-width  characters  in
+       wcwidth.c based on Unicode 10.0.0.
+     * build-fix         for        --enable-sixel-graphics        without
+       --enable-regis-graphics (reports by Sven Joachim, FreeBSD #219945).
 
