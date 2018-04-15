@@ -1,4 +1,4 @@
-/* $XTermId: screen.c,v 1.488 2014/05/03 19:32:51 tom Exp $ */
+/* $XTermId: screen.c,v 1.496 2014/05/26 17:54:45 tom Exp $ */
 
 /*
  * Copyright 1999-2013,2014 by Thomas E. Dickey
@@ -193,7 +193,7 @@ setupLineData(TScreen *screen, ScrnBuf base, Char *data, unsigned nrow, unsigned
     unsigned j;
 #endif
     /* these names are based on types */
-    unsigned skipNcolChar;
+    unsigned skipNcolIAttr;
     unsigned skipNcolCharData;
 #if OPT_ISO_COLORS
     unsigned skipNcolCellColor;
@@ -201,7 +201,7 @@ setupLineData(TScreen *screen, ScrnBuf base, Char *data, unsigned nrow, unsigned
 
     AlignValue(ncol);
 
-    skipNcolChar = (ncol * SizeofScrnPtr(attribs));
+    skipNcolIAttr = (ncol * SizeofScrnPtr(attribs));
     skipNcolCharData = (ncol * SizeofScrnPtr(charData));
 #if OPT_ISO_COLORS
     skipNcolCellColor = (ncol * SizeofScrnPtr(color));
@@ -215,7 +215,7 @@ setupLineData(TScreen *screen, ScrnBuf base, Char *data, unsigned nrow, unsigned
 #if OPT_DEC_CHRSET
 	SetLineDblCS(ptr, 0);
 #endif
-	SetupScrnPtr(ptr->attribs, data, Char);
+	SetupScrnPtr(ptr->attribs, data, IAttr);
 #if OPT_ISO_COLORS
 	SetupScrnPtr(ptr->color, data, CellColor);
 #endif
@@ -735,6 +735,14 @@ CopyCells(TScreen *screen, LineData *src, LineData *dst, int col, int len)
     }
 }
 
+static void
+FillIAttr(IAttr * target, unsigned source, size_t count)
+{
+    while (count-- != 0) {
+	*target++ = (IAttr) source;
+    }
+}
+
 /*
  * Clear cells, no side-effects.
  */
@@ -753,7 +761,7 @@ ClearCells(XtermWidget xw, int flags, unsigned len, int row, int col)
 	for (n = 0; n < len; ++n)
 	    ld->charData[(unsigned) col + n] = (CharData) ' ';
 
-	memset(ld->attribs + col, flags, (size_t) len);
+	FillIAttr(ld->attribs + col, (unsigned) flags, (size_t) len);
 
 	if_OPT_ISO_COLORS(screen, {
 	    CellColor p = xtermColorPair(xw);
@@ -823,7 +831,7 @@ ScrnWriteText(XtermWidget xw,
 {
     TScreen *screen = TScreenOf(xw);
     LineData *ld;
-    Char *attrs;
+    IAttr *attrs;
     int avail = MaxCols(screen) - screen->cur_col;
     IChar *chars;
 #if OPT_WIDE_CHARS
@@ -913,7 +921,7 @@ ScrnWriteText(XtermWidget xw,
 
     flags &= ATTRIBUTES;
     flags |= CHARDRAWN;
-    memset(attrs, (Char) flags, (size_t) real_width);
+    FillIAttr(attrs, flags, (size_t) real_width);
 
     if_OPT_WIDE_CHARS(screen, {
 	size_t off;
@@ -987,7 +995,7 @@ ScrnClearLines(XtermWidget xw, ScrnBuf sb, int where, unsigned n, unsigned size)
 
 	memset(work->charData, 0, size * sizeof(CharData));
 	if (TERM_COLOR_FLAGS(xw)) {
-	    memset(work->attribs, (int) flags, (size_t) size);
+	    FillIAttr(work->attribs, flags, (size_t) size);
 #if OPT_ISO_COLORS
 	    {
 		CellColor p = xtermColorPair(xw);
@@ -997,7 +1005,7 @@ ScrnClearLines(XtermWidget xw, ScrnBuf sb, int where, unsigned n, unsigned size)
 	    }
 #endif
 	} else {
-	    memset(work->attribs, 0, (size_t) size);
+	    FillIAttr(work->attribs, 0, (size_t) size);
 #if OPT_ISO_COLORS
 	    memset(work->color, 0, size * sizeof(work->color[0]));
 #endif
@@ -1372,6 +1380,22 @@ ShowWrapMarks(XtermWidget xw, int row, LineData *ld)
 		   (unsigned) FontHeight(screen));
 }
 
+#if OPT_WIDE_ATTRS
+static unsigned
+refreshFontGCs(XtermWidget xw, unsigned new_attrs, unsigned old_attrs)
+{
+    TScreen *screen = TScreenOf(xw);
+
+    if ((new_attrs & ATR_ITALIC) && !(old_attrs & ATR_ITALIC)) {
+	xtermLoadItalics(xw);
+	xtermUpdateFontGCs(xw, screen->ifnts);
+    } else if (!(new_attrs & ATR_ITALIC) && (old_attrs & ATR_ITALIC)) {
+	xtermUpdateFontGCs(xw, screen->fnts);
+    }
+    return new_attrs;
+}
+#endif
+
 /*
  * Repaints the area enclosed by the parameters.
  * Requires: (toprow, leftcol), (toprow + nrows, leftcol + ncols) are
@@ -1398,6 +1422,9 @@ ScrnRefresh(XtermWidget xw,
     static char first_time = 1;
 #endif
     static int recurse = 0;
+#if OPT_WIDE_ATTRS
+    unsigned old_attrs = 0;
+#endif
 
     TRACE(("ScrnRefresh top %d (%d,%d) - (%d,%d)%s {{\n",
 	   screen->topline, toprow, leftcol,
@@ -1420,7 +1447,7 @@ ScrnRefresh(XtermWidget xw,
 #endif
 #define BLANK_CEL(cell) (chars[cell] == ' ')
 	IChar *chars;
-	Char *attrs;
+	IAttr *attrs;
 	int col = leftcol;
 	int maxcol = leftcol + ncols - 1;
 	int hi_col = maxcol;
@@ -1588,6 +1615,9 @@ ScrnRefresh(XtermWidget xw,
 	    bg = extract_bg(xw, fg_bg, flags);
 	});
 
+#if OPT_WIDE_ATTRS
+	old_attrs = refreshFontGCs(xw, flags, old_attrs);
+#endif
 	gc = updatedXtermGC(xw, flags, fg_bg, hilite);
 	gc_changes |= (flags & (FG_COLOR | BG_COLOR));
 
@@ -1617,7 +1647,10 @@ ScrnRefresh(XtermWidget xw,
 		test = flags;
 		checkVeryBoldColors(test, fg);
 
-		x = drawXtermText(xw, test & DRAWX_MASK, gc, x, y,
+		x = drawXtermText(xw,
+				  test & DRAWX_MASK,
+				  0,
+				  gc, x, y,
 				  GetLineDblCS(ld),
 				  &chars[lastind],
 				  (unsigned) (col - lastind), 0);
@@ -1638,8 +1671,8 @@ ScrnRefresh(XtermWidget xw,
 
 			    if (com_off[i] != 0)
 				drawXtermText(xw,
-					      (test & DRAWX_MASK)
-					      | NOBACKGROUND,
+					      (test & DRAWX_MASK),
+					      NOBACKGROUND,
 					      gc, my_x, y,
 					      GetLineDblCS(ld),
 					      com_off + i,
@@ -1665,6 +1698,9 @@ ScrnRefresh(XtermWidget xw,
 		    wideness = isWide((int) chars[col]);
 		});
 
+#if OPT_WIDE_ATTRS
+		old_attrs = refreshFontGCs(xw, flags, old_attrs);
+#endif
 		gc = updatedXtermGC(xw, flags, fg_bg, hilite);
 		gc_changes |= (flags & (FG_COLOR | BG_COLOR));
 	    }
@@ -1682,7 +1718,10 @@ ScrnRefresh(XtermWidget xw,
 	test = flags;
 	checkVeryBoldColors(test, fg);
 
-	drawXtermText(xw, test & DRAWX_MASK, gc, x, y,
+	drawXtermText(xw,
+		      test & DRAWX_MASK,
+		      0,
+		      gc, x, y,
 		      GetLineDblCS(ld),
 		      &chars[lastind],
 		      (unsigned) (col - lastind), 0);
@@ -1703,8 +1742,8 @@ ScrnRefresh(XtermWidget xw,
 
 		    if (com_off[i] != 0)
 			drawXtermText(xw,
-				      (test & DRAWX_MASK)
-				      | NOBACKGROUND,
+				      (test & DRAWX_MASK),
+				      NOBACKGROUND,
 				      gc, my_x, y,
 				      GetLineDblCS(ld),
 				      com_off + i,
@@ -2380,7 +2419,7 @@ ScrnFillRectangle(XtermWidget xw,
 		    UIntClr(temp, (FG_COLOR | BG_COLOR));
 		}
 		temp = attrs | (temp & (FG_COLOR | BG_COLOR)) | CHARDRAWN;
-		ld->attribs[col] = (Char) temp;
+		ld->attribs[col] = (IAttr) temp;
 #if OPT_ISO_COLORS
 		if (attrs & (FG_COLOR | BG_COLOR)) {
 		    if_OPT_ISO_COLORS(screen, {
@@ -2615,7 +2654,7 @@ ScrnMarkRectangle(XtermWidget xw,
 		    TRACE(("first mask-change is %#x\n",
 			   ld->attribs[col] ^ flags));
 #endif
-		ld->attribs[col] = (Char) flags;
+		ld->attribs[col] = (IAttr) flags;
 	    }
 	}
 	ScrnRefresh(xw,

@@ -1,11 +1,11 @@
-# $XTermId: xterm.spec,v 1.67 2014/04/10 00:27:40 tom Exp $
+# $XTermId: xterm.spec,v 1.69 2014/05/10 13:31:26 tom Exp $
 Summary: X terminal emulator (development version)
 %global my_middle xterm
 %global my_suffix -dev
 %global fullname %{my_middle}%{my_suffix}
 %global my_class XTermDev
 Name: %{fullname}
-Version: 304
+Version: 305
 Release: 1
 License: X11
 Group: User Interface/X
@@ -137,7 +137,6 @@ CPPFLAGS="-DMISC_EXP -DEXP_HTTP_HEADERS" \
 	--with-utempter \
 	--with-icon-name=mini.xterm \
 	--with-xpm
-	copy config.status /tmp/
 make
 
 chmod u+w XTerm.ad
