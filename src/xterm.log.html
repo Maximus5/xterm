@@ -31,7 +31,7 @@
  * sale, use or other dealings in this Software without prior written        *
  * authorization.                                                            *
  *****************************************************************************
-  $XTermId: xterm.log.html,v 1.906 2010/01/22 01:00:37 tom Exp $
+  $XTermId: xterm.log.html,v 1.913 2010/03/07 00:55:04 tom Exp $
   -->
 <HTML>
 <HEAD>
@@ -56,6 +56,7 @@ Most of these are summarized in the XFree86 CHANGELOG
 is the latest version of this file.
 
 <UL>
+<LI><A HREF="#xterm_256">Patch #256 - 2010/3/6</A>
 <LI><A HREF="#xterm_255">Patch #255 - 2010/1/21</A>
 <LI><A HREF="#xterm_254">Patch #254 - 2010/1/6</A>
 <LI><A HREF="#xterm_253">Patch #253 - 2009/12/10</A>
@@ -313,6 +314,37 @@ is the latest version of this file.
 <LI><A HREF="#xterm_02">Patch #2 - 1996/1/7</A>
 <LI><A HREF="#xterm_01">Patch #1 - 1996/1/6</A>
 </UL>
+
+<H1><A NAME="xterm_256">Patch #256 - 2010/3/6</A></H1>
+<ul>
+	<li>add TerminalEmulator to desktop category files.
+
+	<li>modify <code>sinstall.sh</code> to ignore the "." appended to
+	    permissions by selinux.
+
+	<li>change app-defaults organization, installing UXTerm-color
+	    and KOI8XTerm-color for consistent behavior regarding
+	    <code>customization:&nbsp;color</code> (prompted by discussion
+	    in Ubuntu #421261).
+
+	<li>fix typo in <code>minstall.sh</code> from
+	    <a href="#xterm_255">patch #255</a> changes,
+	    and add case for
+	    <code>/var/run</code> needed for full path of utmp
+	    (report by Julien Cristau).
+
+	<li>minor fix to xterm manpage, remove a comment stating that margin
+	    bell can be changed via the VT Options menu.  That was replaced in 
+	    <a href="#xterm_225">patch #225</a>
+
+	<li>add a "docs" rule to makefile.
+
+	<li>fix initialization of Atom used for <code>XkbBell</code> feature
+	    from <a href="#xterm_243">patch 243</a> changes.
+	    Unlike the other calls to <code>XInternAtom()</code>,
+	    in this case the flag telling X to create the Atom was unset
+	    (patch by Chris Adams).
+</ul>
 
 <H1><A NAME="xterm_255">Patch #255 - 2010/1/21</A></H1>
 <ul>
