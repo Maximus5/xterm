@@ -31,7 +31,7 @@
  * sale, use or other dealings in this Software without prior written        *
  * authorization.                                                            *
  *****************************************************************************
-  $XTermId: xterm.log.html,v 1.1246 2012/10/09 10:42:15 tom Exp $
+  $XTermId: xterm.log.html,v 1.1253 2012/10/14 21:43:46 tom Exp $
   -->
 
 <html>
@@ -70,6 +70,8 @@
   the latest version of this file.</p>
 
   <ul>
+    <li><a href="#xterm_284">Patch #284 - 2012/10/14</a></li>
+
     <li><a href="#xterm_283">Patch #283 - 2012/10/09</a></li>
 
     <li><a href="#xterm_282">Patch #282 - 2012/09/28</a></li>
@@ -847,6 +849,38 @@
     <li><a href="#xterm_02">Patch #2 - 1996/1/7</a></li>
 
     <li><a href="#xterm_01">Patch #1 - 1996/1/6</a></li>
+  </ul>
+
+  <h1><a name="xterm_284" id="xterm_284">Patch #284 -
+  2012/10/14</a></h1>
+
+  <ul>
+    <li>amend configurability changes for icons from <a href=
+    "#xterm_283">patch #283</a>, moving the new functionality to
+    the <code>iconHint</code> resource to avoid conflict with
+    existing uses of the <code>iconName</code> resource in the
+    <code>Shell</code> widget (report by Emanuel Haupt).</li>
+
+    <li>fix documentation errata (reports by Miroslav Lichvar):
+
+      <ul>
+        <li>correct manpage default for <code>allowTcapOps</code>
+        (see <a href="#xterm_243">patch #243</a></li>
+
+        <li>modify documentation for configure
+        <code>--enable-backarrow-key</code> to match the script
+        (see <a href="#xterm_280">patch #280</a>).</li>
+
+        <li>fix typo in <code>minstall.sh</code> in <a href=
+        "#xterm_283">patch #283</a>, which made the leading-cap
+        "Xterm" become "xterm" (patch by Miroslav).</li>
+      </ul>
+    </li>
+
+    <li>fix two typos in configure.in from <a href=
+    "#xterm_283">patch #283</a> changes; one broke the
+    <code>--regex</code> configure option (report by H Merijn
+    Brand).</li>
   </ul>
 
   <h1><a name="xterm_283" id="xterm_283">Patch #283 -
