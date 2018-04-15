@@ -1,4 +1,4 @@
-/* $XTermId: ptyx.h,v 1.538 2009/01/25 23:33:02 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.542 2009/02/10 23:24:50 tom Exp $ */
 
 /*
  * Copyright 1999-2008,2009 by Thomas E. Dickey
@@ -391,6 +391,10 @@ typedef struct {
 
 #ifndef OPT_AIX_COLORS
 #define OPT_AIX_COLORS  1 /* true if xterm is configured with AIX (16) colors */
+#endif
+
+#ifndef OPT_ALLOW_XXX_OPS
+#define OPT_ALLOW_XXX_OPS 1 /* true if xterm adds "Allow XXX Ops" submenu */
 #endif
 
 #ifndef OPT_BLINK_CURS
@@ -1772,6 +1776,12 @@ typedef struct _TekScreen {
 #define MULTICLICKTIME 250	/* milliseconds */
 
 typedef enum {
+    fwNever = 0,
+    fwResource,
+    fwAlways
+} fontWarningTypes;
+
+typedef enum {
     keyboardIsLegacy,		/* bogus vt220 codes for F1-F4, etc. */
     keyboardIsDefault,
     keyboardIsHP,
@@ -1884,6 +1894,7 @@ typedef struct _Misc {
 #if OPT_INPUT_METHOD
     char *f_x;			/* font for XIM */
 #endif
+    fontWarningTypes fontWarnings;
     int limit_resize;
 #ifdef ALLOWLOGGING
     Boolean log_on;
@@ -2214,6 +2225,12 @@ typedef struct _TekWidgetRec {
 
 #define BorderWidth(w)		((w)->core.border_width)
 #define BorderPixel(w)		((w)->core.border_pixel)
+
+#define AllowXtermOps(w,name)	((w)->screen.name && !(w)->screen.allowSendEvents)
+#define AllowFontOps(w)		AllowXtermOps(w, allowFontOps)
+#define AllowTcapOps(w)		AllowXtermOps(w, allowTcapOps)
+#define AllowTitleOps(w)	AllowXtermOps(w, allowTitleOps)
+#define AllowWindowOps(w)	AllowXtermOps(w, allowWindowOps)
 
 #if OPT_TOOLBAR
 #define ToolbarHeight(w)	((resource.toolBar) \

@@ -1,4 +1,4 @@
-/* $XTermId: button.c,v 1.300 2009/01/22 23:47:52 tom Exp $ */
+/* $XTermId: button.c,v 1.306 2009/02/13 21:09:08 tom Exp $ */
 
 /*
  * Copyright 1999-2008,2009 by Thomas E. Dickey
@@ -337,7 +337,9 @@ SendLocatorPosition(XtermWidget xw, XEvent * event)
     /* update mask to "after" state */
     state ^= 1 << button;
     /* swap Button1 & Button3 */
-    state = (state & ~(4 | 1)) | ((state & 1) ? 4 : 0) | ((state & 4) ? 1 : 0);
+    state = ((state & (unsigned) ~(4 | 1))
+	     | ((state & 1) ? 4 : 0)
+	     | ((state & 4) ? 1 : 0));
 
     reply.a_param[1] = (ParmType) state;
     reply.a_param[2] = (ParmType) row;
@@ -1077,14 +1079,13 @@ static Char *
 UTF8toLatin1(Char * s, unsigned len, unsigned long *result)
 {
     static Char *buffer;
-    static size_t used;
+    static Cardinal used;
 
     Char *q;
 
-    if (used == 0) {
-	buffer = (Char *) XtMalloc(1 + (used = len));
-    } else if (len > used) {
-	buffer = (Char *) XtRealloc((char *) buffer, 1 + (used = len));
+    if (len > used) {
+	used = 1 + (2 * len);
+	allocXtermChars(&buffer, used);
     }
 
     if (buffer != 0) {
@@ -1107,7 +1108,7 @@ UTF8toLatin1(Char * s, unsigned len, unsigned long *result)
 		    if (eqv == value)
 			eqv = '#';
 		    *q++ = (Char) eqv;
-		    if (iswide((wchar_t) value))
+		    if (isWide((wchar_t) value))
 			*q++ = ' ';
 		}
 	    }
@@ -2247,7 +2248,7 @@ ResizeSelection(TScreen * screen GCC_UNUSED, int rows, int cols)
 Bool
 iswide(int i)
 {
-    return (i == HIDDEN_CHAR) || (my_wcwidth(i) == 2);
+    return (i == HIDDEN_CHAR) || ((i >= FIRST_WIDECHAR) && my_wcwidth(i) == 2);
 }
 
 #define isWideCell(row, col) iswide((int)XTERM_CELL(row, col))
@@ -3474,7 +3475,7 @@ _OwnSelection(XtermWidget xw,
 	    (unsigned long) (4 * XMaxRequestSize(XtDisplay((Widget) xw)) - 32);
 	    if (screen->selection_length > limit) {
 		fprintf(stderr,
-			"%s: selection too big (%ld bytes), not storing in CUT_BUFFER%d\n",
+			"%s: selection too big (%lu bytes), not storing in CUT_BUFFER%d\n",
 			xterm_name, screen->selection_length, cutbuffer);
 	    } else {
 		/* This used to just use the UTF-8 data, which was totally
@@ -3613,7 +3614,7 @@ SaveText(TScreen * screen,
 	/* We want to strip out every occurrence of HIDDEN_CHAR AFTER a
 	 * wide character.
 	 */
-	if (c == HIDDEN_CHAR && iswide((int) previous)) {
+	if (c == HIDDEN_CHAR && isWide((int) previous)) {
 	    previous = c;
 	    /* Combining characters attached to double-width characters
 	       are in memory attached to the HIDDEN_CHAR */
