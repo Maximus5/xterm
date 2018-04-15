@@ -1,4 +1,4 @@
-/* $XTermId: charproc.c,v 1.1480 2017/05/31 20:23:39 tom Exp $ */
+/* $XTermId: charproc.c,v 1.1487 2017/06/12 01:01:20 tom Exp $ */
 
 /*
  * Copyright 1999-2016,2017 by Thomas E. Dickey
@@ -3640,6 +3640,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 		} else {
 		    int status = 3;
 		    int result = 0;
+		    int result2 = 0;
 
 		    TRACE(("CASE_GRAPHICS_ATTRIBUTES request: %d, %d, %d\n",
 			   GetParam(0), GetParam(1), GetParam(2)));
@@ -3663,8 +3664,54 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 				result = (int) get_color_register_count(screen);
 			    }
 			    break;
+			case 4:	/* read maximum */
+			    status = 0;
+			    result = MAX_COLOR_REGISTERS;
+			    break;
 			default:
 			    TRACE(("DATA_ERROR: CASE_GRAPHICS_ATTRIBUTES color register count request with unknown action parameter: %d\n",
+				   GetParam(1)));
+			    status = 2;
+			    break;
+			}
+			break;
+		    case 2:	/* graphics geometry */
+			switch (GetParam(1)) {
+			case 1:	/* read */
+			    status = 0;
+			    result = screen->graphics_max_wide;
+			    result2 = screen->graphics_max_high;
+			    break;
+			case 2:	/* reset */
+			    /* FALLTHRU */
+			case 3:	/* set */
+			    /* FALLTHRU */
+			case 4:	/* read maximum */
+			    /* not implemented */
+			    break;
+			default:
+			    TRACE(("DATA_ERROR: CASE_GRAPHICS_ATTRIBUTES graphics geometry request with unknown action parameter: %d\n",
+				   GetParam(1)));
+			    status = 2;
+			    break;
+			}
+			break;
+		    case 3:	/* ReGIS geometry */
+			switch (GetParam(1)) {
+			case 1:	/* read */
+			    status = 0;
+			    result = screen->graphics_regis_def_wide;
+			    result2 = screen->graphics_regis_def_high;
+			    break;
+			case 2:	/* reset */
+			    /* FALLTHRU */
+			case 3:	/* set */
+			    /* FALLTHRU */
+			case 4:	/* read maximum */
+			    /* not implemented */
+			    break;
+			default:
+			    TRACE(("DATA_ERROR: CASE_GRAPHICS_ATTRIBUTES ReGIS geometry request with unknown action parameter: %d\n",
 				   GetParam(1)));
 			    status = 2;
 			    break;
@@ -3679,10 +3726,13 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 
 		    init_reply(ANSI_CSI);
 		    reply.a_pintro = '?';
-		    reply.a_nparam = 3;
-		    reply.a_param[0] = (ParmType) GetParam(0);
-		    reply.a_param[1] = (ParmType) status;
-		    reply.a_param[2] = (ParmType) result;
+		    count = 0;
+		    reply.a_param[count++] = (ParmType) GetParam(0);
+		    reply.a_param[count++] = (ParmType) status;
+		    reply.a_param[count++] = (ParmType) result;
+		    if (GetParam(0) >= 2)
+			reply.a_param[count++] = (ParmType) result2;
+		    reply.a_nparam = (ParmType) count;
 		    reply.a_inters = 0;
 		    reply.a_final = 'S';
 		    unparseseq(xw, &reply);
@@ -5079,6 +5129,7 @@ dotext(XtermWidget xw,
 	    if (chars_chomped != 0 && next_col <= screen->max_col) {
 		WriteText(xw, buf + offset, chars_chomped);
 	    } else if (!did_wrap
+		       && len > 0
 		       && (xw->flags & WRAPAROUND)
 		       && screen->cur_col > ScrnLeftMargin(xw)) {
 		force_wrap = True;
@@ -8450,6 +8501,13 @@ VTInitialize(Widget wrequest,
     request->screen.utf8_fonts =
 	extendedBoolean(request->screen.utf8_fonts_s, tblUtf8Mode, uLast);
 
+    /*
+     * Make a copy in the input/request so that DefaultFontN() works for
+     * the "CHECKFONT" option.
+     */
+    copyFontList(&(request->work.fonts.x11.list_n),
+		 wnew->work.fonts.x11.list_n);
+
     VTInitialize_locale(request);
     init_Bres(screen.normalized_c);
     init_Bres(screen.utf8_latin1);
@@ -8466,6 +8524,8 @@ VTInitialize(Widget wrequest,
     init_Ires(screen.utf8_mode);
     init_Ires(screen.utf8_fonts);
     init_Ires(screen.max_combining);
+
+    init_Ires(screen.utf8_always);	/* from utf8_mode, used in doparse */
 
     if (screen->max_combining < 0) {
 	screen->max_combining = 0;
@@ -8792,6 +8852,9 @@ VTInitialize(Widget wrequest,
 	wnew->keyboard.flags |= MODE_DECKPAM;
 
     initLineData(wnew);
+#if OPT_WIDE_CHARS
+    freeFontList(&(request->work.fonts.x11.list_n));
+#endif
     return;
 }
 
@@ -9232,7 +9295,7 @@ VTRealize(Widget w,
     TabReset(xw->tabs);
 
     if (screen->menu_font_number == fontMenu_default) {
-	myfont = xtermFontName(DefaultFontN(xw));
+	myfont = defaultVTFontNames(xw);
     } else {
 	myfont = xtermFontName(screen->MenuFontName(screen->menu_font_number));
     }
@@ -10029,6 +10092,70 @@ VTSetValues(Widget cur,
     return refresh_needed;
 }
 
+/*
+ * Given a font-slot and information about selection/reverse, find the
+ * corresponding cached-GC slot.
+ */
+static int
+reverseCgs(XtermWidget xw, unsigned attr_flags, Bool hilite, int font)
+{
+    TScreen *screen = TScreenOf(xw);
+    CgsEnum result = gcMAX;
+
+    if (ReverseOrHilite(screen, attr_flags, hilite)) {
+	switch (font) {
+	case fNorm:
+	    result = gcNormReverse;
+	    break;
+	case fBold:
+	    result = gcBoldReverse;
+	    break;
+#if OPT_WIDE_ATTRS || OPT_RENDERWIDE
+	case fItal:
+	    result = gcNormReverse;	/* FIXME */
+	    break;
+#endif
+#if OPT_WIDE_CHARS
+	case fWide:
+	    result = gcWideReverse;
+	    break;
+	case fWBold:
+	    result = gcWBoldReverse;
+	    break;
+	case fWItal:
+	    result = gcWideReverse;	/* FIXME */
+	    break;
+#endif
+	}
+    } else {
+	switch (font) {
+	case fNorm:
+	    result = gcNorm;
+	    break;
+	case fBold:
+	    result = gcBold;
+	    break;
+#if OPT_WIDE_ATTRS || OPT_RENDERWIDE
+	case fItal:
+	    result = gcNorm;	/* FIXME */
+	    break;
+#endif
+#if OPT_WIDE_CHARS
+	case fWide:
+	    result = gcWide;
+	    break;
+	case fWBold:
+	    result = gcWBold;
+	    break;
+	case fWItal:
+	    result = gcWide;	/* FIXME */
+	    break;
+#endif
+	}
+    }
+    return result;
+}
+
 #define setGC(code) set_at = __LINE__, currentCgs = code
 
 #define OutsideSelection(screen,srow,scol)  \
@@ -10444,6 +10571,7 @@ HideCursor(void)
     int cursor_col;
     CLineData *ld = 0;
 #if OPT_WIDE_ATTRS
+    CgsEnum which_Cgs = gcMAX;
     unsigned attr_flags;
     int which_font = fNorm;
 #endif
@@ -10531,11 +10659,15 @@ HideCursor(void)
 		which_font = ((attr_flags & BOLD) ? fWBold : fWide);
 	    }
 	});
-	setCgsFont(xw, WhichVWin(screen),
-		   whichXtermCgs(xw, attr_flags, in_selection),
-		   (((attr_flags & ATR_ITALIC) && UseItalicFont(screen))
-		    ? getItalicFont(screen, which_font)
-		    : getNormalFont(screen, which_font)));
+
+	which_Cgs = reverseCgs(xw, attr_flags, in_selection, which_font);
+	if (which_Cgs != gcMAX) {
+	    setCgsFont(xw, WhichVWin(screen),
+		       which_Cgs,
+		       (((attr_flags & ATR_ITALIC) && UseItalicFont(screen))
+			? getItalicFont(screen, which_font)
+			: getNormalFont(screen, which_font)));
+	}
     }
 #endif
 
@@ -10573,9 +10705,9 @@ HideCursor(void)
     screen->cursor_state = OFF;
 
 #if OPT_WIDE_ATTRS
-    if ((attr_flags & ATR_ITALIC) ^ (xw->flags & ATR_ITALIC)) {
+    if (which_Cgs != gcMAX) {
 	setCgsFont(xw, WhichVWin(screen),
-		   whichXtermCgs(xw, xw->flags, in_selection),
+		   which_Cgs,
 		   (((xw->flags & ATR_ITALIC) && UseItalicFont(screen))
 		    ? getItalicFont(screen, which_font)
 		    : getNormalFont(screen, which_font)));

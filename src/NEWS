@@ -1,135 +1,44 @@
 The NEWS file was generated from xterm.log.html, which serves as the changelog
 for xterm.
 --------------------------------------------------------------------------------
-                            Patch #328 - 2017/06/01
+                            Patch #329 - 2017/06/12
 
-     * revise parser for charClass resource, making these improvements:
-          + accept octal and hexadecimal values
-          + allow embedded whitespace
-          + allow  the  class  after  colon to be optional, e.g., to clear
-            class settings for a range of characters.
-     * add command-line option -report-charclass.
-     * fix most lintian warnings about test-package
-     * add eraseSavedLines resource.
-     * document DECSED 3 in ctlseqs.ms (report by Ben Longmans).
-     * improve   integration  between  configure-events  and  updates  for
-       reported screensize, in particular when switching between vt100 and
-       tek4014 modes.
-     * modify  selection-highlighting  of  reverse-video text to keep that
-       distinct,   e.g.,   by   reversing  the  selection  foreground  and
-       background  colors as one would expect. This fixes a "useless" case
-       in the description of highlightColorMode.
-     * improve fix for Debian #759734, addressing a case where non-colored
-       cursor would be invisible against reverse-video (see patch #311).
+     * add  control  sequences  for  reading  the Sixel and ReGIS graphics
+       sizes (suggested by Ben Wong).
+     * add  a  workaround  for  wcwidth  returning -1 for characters which
+       should have been printable (FreeBSD #219800).
+     * fix a bug in font initialization from patch #328 (FreeBSD #219800).
+     * fix  a special case in HideCursor which assigned a bold font to the
+       slot  used  for  normal  font  in changes for italics in patch #307
+       (Debian #858304).
      * updates for ReGIS (Ross Combs):
-          + the  "H"  option of the "T" command should multiply by 10, not
+          + Strings  specified  with  no  command  are used as "comments".
+            Print these in the log when tracing.
+          + Catch  attempts  to use "alternate display" mode (AKA "blink")
+            from the GIGI, but do not implement it.
+          + The  T(M)  command  should only multiply the height by 10, not
             20.
-          + display unknown glyphs as a solid block.
-          + given a succession of text-direction options, use the last.
-          + fix  the  direction  of  ReGIS  slanted  text so that negative
-            values produce oblique output .
-          + fix  the ReGIS text direction option to only rotate characters
-            when no following size option is used.
-     * update  terminfo  to better match corresponding entries in ncurses,
-       e.g.,   u8  pattern  to  match  the  VT220,  VT420,  etc.,  primary
-       responses, as well as adding smxx and rmxx.
-     * fixes from Jörg Sommer:
-          + corrected  a trace-message regarding maximum graphics-size; it
-            used  the  similar  ReGIS  maximum  size  which  might  not be
-            configured.
-          + in  do_select_regex,  clear selection if there is no match. If
-            the  regex  does  not  match  anything  around the cursor, the
-            selection  returned must be empty, otherwise the whole line is
-            treated   as   a  match.  This  way  the  command  defined  by
-            exec-selectable will not be executed if there is no match.
-          + modify  limit  in  do_select_regex to include the character at
-            the  cursor  in  the match, making it easier to type something
-            and then hit the key to trigger exec-selectable.
-          + If exec-selectable or insert-selection is triggered by a mouse
-            button  click,  the  position  of  the mouse pointer should be
-            used.  This  makes  it  easier  to address any position on the
-            window  and  it  makes it possible to use the mouse, e.g., for
-            applications such as mutt where you cannot move the cursor.
-     * modify  DECRC  to  save/restore  xterm's  last-column  flag used to
-       control   wrapping   behavior   rather   than  manipulating  DECAWM
-       (report/analysis by Mattias Engdegård).
-     * add  configure option --enable-terminfo-env to use the value set by
-       --with-own-terminfo  for  the  $TERMINFO environment variable. That
-       variable  was  set  automatically  for HPUX, but would be useful in
-       other systems, e.g., for Solaris (request by Jeff Wieland).
-     * fix a race condition when setting up a signal handler to timeout if
-       opening /dev/tty hangs (patch by Tobias Stoeckmann).
-     * review/cleanup  resources which were not in the manual page (report
-       by Maxwell Anselm):
-          + add manual page description as needed.
-          + drop resource name for menuBar, as unnecessary.
-          + modify  fallback numeric value for regisScreenSize resource to
-            match that for maxGraphicSize.
-     * updated    configure    macros    CF_ADD_CFLAGS,   CF_CC_ENV_FLAGS,
-       CF_GNU_SOURCE,   CF_MATH_LIB,   and   CF_XOPEN_SOURCE   from  other
-       program-changes.
-     * update config.guess, config.sub
-     * change  “maximum screensize” assumed by resize to 9999x9999, to
-       accommodate people using the Unreadable font.
-     * drop  Utility from default value of --with-desktop-category (Debian
-       #780176).
-     * widen  the  configure  script  pattern  used  for  finding  related
-       ".desktop" files, including “Terminal”
-     * several minor improvements to font utility functions:
-          + provide  for  later  modification  to  implement  font-sets by
-            parsing the font resources as comma-separated lists.
-          + parse -fn and -fa similarly, using “x:” and “xft:” prefixes
-            for  font  name/family strings to distinguish between XLFD and
-            Xft font specifications.
-          + use loops to iterate over font classes
-          + use  getters/setters  for  font  data  to  allow for on-demand
-            lookups.
-          + make  the debugging trace for missing glyph less verbose since
-            that interferes with the -report-fonts option.
-          + refactor  xtermLoadFont  to make it clearer how some fonts are
-            derived from others, e.g., bold, wide.
-          + make  the  triggering  and  suppressing  of font-warnings more
-            consistent by storing the last state in the widget.
-          + reduce font-warnings by checking for repeated warnings.
-     * add vttests/query-status.pl
-     * add vttests/closest-rgb
-     * add  special  case for displaying soft-hyphen if it happens to fall
-       at  the  right  margin,  and omitting similar case such as the BIDI
-       markers,   where  a  zero-width  character  is  neither  a  control
-       character nor a combining character (Debian #844325).
-     * modify  logic  for OSC 52, manipulate selection data, to update the
-       selection-time  to  include  the  latest  X events. This fixes some
-       cases  where the selection was invalid, e.g., after an event due to
-       focus-follows-mouse (report/testcase by Stephane Chauveau).
-     * revise  macro  CastMallocN  as new macro TextAlloc to make explicit
-       use of sizeof(char) (prompted by patch by Cade Foster).
-     * add “Mouse Ops” menu entry and related resources to allow runtime
-       disabling/enabling   of   the   mouse   protocol  escape  sequences
-       (discussion with Bob Proulx).
-     * improve  discussion  of mouse actions versus protocol in the manual
-       (discussion with Bob Proulx).
-     * improve discussion of environment variables in the manual, pointing
-       out  where  some  features (such as termcap and the System5 COLUMNS
-       and  LINES  variables)  are  used  rarely, mainly to support legacy
-       applications.
-     * add  examples  of  translations  resource for select/paste, and for
-       font-size changes to the manual.
-     * minor  reordering  of  some  entries  in ctlseqs.ms for consistency
-       (report by Arran Ubels).
-     * add  -s  option  to  256colors2.pl and 88colors2.pl, to demonstrate
-       modifying the “system” colors 0–15.
-     * omit  XFT_SPACING  property  from  call to XftPatternBuild, to work
-       around  a  bug  in  fontconfig  for handling Google Go fonts, whose
-       names  sort  in  an  order  not expected by fontconfig, causing the
-       request for a monospaced font to return italics, e.g.,
-
-$ fc-match 'Go Mono:spacing=monospace'
-Go-Mono-Italic.ttf: "Go Mono" "Italic"
-(report by Giacomo Boffi on Stackoverflow).
-
-
-     * modify minstall.in to improve a workaround added to the manual page
-       in  patch #182 to avoid having the C preprocessor used in the imake
-       configuration  strip  out  the  comments  in  the character classes
-       section (reports by Ted Unangst, Anthony J Bentley).
+          + Make  the  S(E)  command reset more state than just the screen
+            contents.
+          + Remove two rotation variables which were only being printed.
+          + Numerous minor fixes and comment updates in the R command.
+          + Unknown R command option names trigger an empty response.
+          + Fix  the  output  position after printing rotated text (it was
+            missing the the sign before).
+          + Fix  the  position  change  with pixelvectors and rotated text
+            (the rotation transform was not being applied).
+          + Update  the TODO list and remove a verification FIXME (slanted
+            text positioning is correct as is).
+          + Emulate  the  approximately  1.4x  enlargement  for text which
+            isn't rotated at right angles.
+          + Only  update the color planes specified in the plane mask (the
+            W command's F option).
+     * fix  a  bug  introduced by the changes to font information in patch
+       #328.   When  processing  the  "checkfont"  option  of  the  locale
+       resource,  the  program  referred  to the request data, to an array
+       which  was  only  allocated  in  the new/result widget (report by H
+       Merijn Brand).
+     * fix  a  missing assignment initialization to make the utf8 resource
+       control  whether  escape sequences to enable/disable UTF-8 mode are
+       allowed.
 
