@@ -1,4 +1,4 @@
-/* $XTermId: main.c,v 1.769 2015/04/10 00:33:25 tom Exp $ */
+/* $XTermId: main.c,v 1.772 2015/08/19 00:25:35 tom Exp $ */
 
 /*
  * Copyright 2002-2014,2015 by Thomas E. Dickey
@@ -2201,8 +2201,6 @@ main(int argc, char *argv[]ENVP_ARG)
 	setEffectiveUser(save_ruid);
 	TRACE_IDS;
 #endif
-	init_colored_cursor();
-
 	toplevel = xtermOpenApplication(&app_con,
 					my_class,
 					optionDescList,
@@ -3393,6 +3391,7 @@ spawnXTerm(XtermWidget xw)
 	    ttyfd = -1;
 	    errno = ENXIO;
 	}
+	shell_path = 0;
 	memset(&pw, 0, sizeof(pw));
 #if OPT_PTY_HANDSHAKE
 	got_handshake_size = False;
@@ -3680,7 +3679,7 @@ spawnXTerm(XtermWidget xw)
     added_utmp_entry = False;
 #if defined(USE_UTEMPTER)
 #undef UTMP
-    if (!resource.utmpInhibit) {
+    if (xw->misc.login_shell && !resource.utmpInhibit) {
 	struct UTMP_STR dummy;
 
 	/* Note: utempter may trim it anyway */

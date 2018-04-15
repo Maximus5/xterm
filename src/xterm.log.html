@@ -30,7 +30,7 @@
  * sale, use or other dealings in this Software without prior written        *
  * authorization.                                                            *
  *****************************************************************************
-  $XTermId: xterm.log.html,v 1.1604 2015/04/13 01:11:51 tom Exp $
+  $XTermId: xterm.log.html,v 1.1617 2015/08/20 01:02:38 tom Exp $
   -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 
@@ -72,6 +72,8 @@
   CHANGELOG</a>).</p>
 
   <ul>
+    <li><a href="#xterm_319">Patch #319 - 2015/08/19</a></li>
+
     <li><a href="#xterm_318">Patch #318 - 2015/04/12</a></li>
 
     <li><a href="#xterm_317">Patch #317 - 2015/03/27</a></li>
@@ -919,6 +921,62 @@
     <li><a href="#xterm_02">Patch #2 - 1996/1/7</a></li>
 
     <li><a href="#xterm_01">Patch #1 - 1996/1/6</a></li>
+  </ul>
+
+  <h1><a name="xterm_319" id="xterm_319">Patch #319 -
+  2015/08/19</a></h1>
+
+  <ul>
+    <li>add a section to <code>ctlseqs.ms</code> discussing control
+    sequences and ECMA-48, to explain why C1 controls do not occur
+    in the decoded characters from UTF-8 byte streams (prompted by
+    discussion with Poul-Henning Kamp).</li>
+
+    <li>modify check for cursor-theme from <a href=
+    "#xterm_301">patch #301</a> to also check if the resource
+    <code>Xcursor.theme</code> is set to a nonempty value before
+    fallback to xterm's own dummy theme (request by Robert
+    Kloefkorn).</li>
+
+    <li>explain in <code>ctlseqs.ms</code> that some keys which
+    normally send SS3-prefixes are changed to CSI-prefixes if
+    key-modifiers are passed as parameters (report by George
+    Nachman).</li>
+
+    <li>correct double-free of font information when multiple
+    problems are found, particularly for the wide fonts loaded via
+    the <code>-wc</code> option (report/testcase by Nelson
+    Beebe).</li>
+
+    <li>make configure option <code>--enable-builtin-xpms</code>
+    actually work (report by William Bulley).</li>
+
+    <li>correct combination of <code>-ls</code> and <code>-e</code>
+    options for utempter configuration (Debian #794201).</li>
+
+    <li>NetBSD build-fix for OPT_RENDERFONT versus OPT_SHIFT_FONTS
+    (patch by Matthew Green, forwarded by Thomas Klausner).</li>
+
+    <li>fix a few minor bugs found with Coverity.</li>
+
+    <li>update pixelvector handling (patch by Ross Combs):
+
+      <ul>
+        <li>split pixel-based and coord-based functions with common
+        parts factored out to a "raw" function</li>
+
+        <li>add a "step" variant which loads a single PV digit</li>
+      </ul>
+    </li>
+
+    <li>make the graphic dirty upon resize or clear, fixing some
+    missing refreshes (patch by Ross Combs)</li>
+
+    <li>fixes scrolling to use user coordinates and move in the
+    correct direction (patch by Ross Combs)</li>
+
+    <li>several fixes/improvements for ReGIS whitespace and
+    page-handling (patch by Ross Combs).</li>
   </ul>
 
   <h1><a name="xterm_318" id="xterm_318">Patch #318 -

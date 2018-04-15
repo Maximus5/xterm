@@ -1,4 +1,4 @@
-/* $XTermId: charproc.c,v 1.1409 2015/04/12 16:57:00 tom Exp $ */
+/* $XTermId: charproc.c,v 1.1413 2015/07/15 09:21:40 tom Exp $ */
 
 /*
  * Copyright 1999-2014,2015 by Thomas E. Dickey
@@ -7075,9 +7075,23 @@ RequestResize(XtermWidget xw, int rows, int cols, Bool text)
 
     TRACE(("RequestResize(rows=%d, cols=%d, text=%d)\n", rows, cols, text));
 
-    if ((int) (askedWidth = (Dimension) cols) < cols
-	|| (int) (askedHeight = (Dimension) rows) < rows)
-	return;
+    /* check first if the row/column values fit into a Dimension */
+    if (cols > 0) {
+	if ((int) (askedWidth = (Dimension) cols) < cols) {
+	    TRACE(("... cols too large for Dimension\n"));
+	    return;
+	}
+    } else {
+	askedWidth = 0;
+    }
+    if (rows > 0) {
+	if ((int) (askedHeight = (Dimension) rows) < rows) {
+	    TRACE(("... rows too large for Dimension\n"));
+	    return;
+	}
+    } else {
+	askedHeight = 0;
+    }
 
     if (askedHeight == 0
 	|| askedWidth == 0
@@ -10921,7 +10935,7 @@ HandleKeymapChange(Widget w,
     size_t len;
 
     TRACE(("HandleKeymapChange(%#lx, %s)\n",
-	   w,
+	   (unsigned long) w,
 	   (*param_count
 	    ? params[0]
 	    : "missing")));
