@@ -1,4 +1,4 @@
-/* $XTermId: xterm.h,v 1.608 2010/01/20 01:36:37 tom Exp $ */
+/* $XTermId: xterm.h,v 1.625 2010/04/18 17:10:42 tom Exp $ */
 
 /************************************************************
 
@@ -55,7 +55,7 @@ authorization.
 
 #if defined(__GNUC__) && defined(_FORTIFY_SOURCE)
 #define USE_IGNORE_RC
-#define IGNORE_RC(func) ignore_unused = func
+#define IGNORE_RC(func) ignore_unused = (int) func
 #else
 #define IGNORE_RC(func) (void) func
 #endif /* gcc workarounds */
@@ -338,6 +338,7 @@ extern char **environ;
 #define XtNallowC1Printable	"allowC1Printable"
 #define XtNallowColorOps	"allowColorOps"
 #define XtNallowFontOps		"allowFontOps"
+#define XtNallowScrollLock	"allowScrollLock"
 #define XtNallowSendEvents	"allowSendEvents"
 #define XtNallowTcapOps		"allowTcapOps"
 #define XtNallowTitleOps	"allowTitleOps"
@@ -510,6 +511,7 @@ extern char **environ;
 #define XtCAllowC1Printable	"AllowC1Printable"
 #define XtCAllowColorOps	"AllowColorOps"
 #define XtCAllowFontOps		"AllowFontOps"
+#define XtCAllowScrollLock	"AllowScrollLock"
 #define XtCAllowSendEvents	"AllowSendEvents"
 #define XtCAllowTcapOps		"AllowTcapOps"
 #define XtCAllowTitleOps	"AllowTitleOps"
@@ -766,9 +768,8 @@ extern void ReadLineButton             PROTO_XT_ACTIONS_ARGS;
 
 #if OPT_WIDE_CHARS
 extern Bool iswide(int  /* i */);
-#define FIRST_WIDECHAR 256
-#define WideCells(n) (((IChar)(n) >= FIRST_WIDECHAR) ? my_wcwidth((wchar_t) (n)) : 1)
-#define isWide(n)    (((IChar)(n) >= FIRST_WIDECHAR) && iswide(n))
+#define WideCells(n) (((IChar)(n) >= first_widechar) ? my_wcwidth((wchar_t) (n)) : 1)
+#define isWide(n)    (((IChar)(n) >= first_widechar) && iswide(n))
 #else
 #define WideCells(n) 1
 #endif
@@ -796,7 +797,6 @@ extern void noleaks_cachedCgs (XtermWidget /* xw */);
 /* charproc.c */
 extern Bool CheckBufPtrs (TScreen * /* screen */);
 extern int VTInit (XtermWidget /* xw */);
-extern int v_write (int  /* f */, Char * /* d */, unsigned  /* len */);
 extern void FindFontSelection (XtermWidget /* xw */, const char * /* atom_name */, Bool  /* justprobe */);
 extern void HideCursor (void);
 extern void RestartBlinking(TScreen * /* screen */);
@@ -819,6 +819,7 @@ extern void unparseputc1 (XtermWidget /* xw */, int  /* c */);
 extern void unparseputn (XtermWidget /* xw */, unsigned /* n */);
 extern void unparseputs (XtermWidget /* xw */, const char * /* s */);
 extern void unparseseq (XtermWidget /* xw */, ANSI * /* ap */);
+extern void v_write (int  /* f */, Char * /* d */, unsigned  /* len */);
 extern void xtermAddInput(Widget  /* w */);
 
 #if OPT_BLINK_CURS
@@ -917,6 +918,7 @@ extern SIGNAL_T Exit (int  /* n */);
 #endif
 
 #if OPT_WIDE_CHARS
+extern unsigned first_widechar;
 extern int (*my_wcwidth)(wchar_t);
 #endif
 
@@ -926,7 +928,7 @@ extern void repairSizeHints    (void);
 extern void show_8bit_control  (Bool  /* value */);
 
 /* misc.c */
-extern Bool AllocateTermColor(XtermWidget, ScrnColors *, int, const char *);
+extern Bool AllocateTermColor(XtermWidget, ScrnColors *, int, const char *, Bool);
 extern Cursor make_colored_cursor (unsigned /* cursorindex */, unsigned long  /* fg */, unsigned long  /* bg */);
 extern OptionHelp * sortedOpts(OptionHelp *, XrmOptionDescRec *, Cardinal);
 extern Window WMFrameWindow(XtermWidget /* termw */);
@@ -966,7 +968,7 @@ extern void ReverseOldColors (void);
 extern void SysError (int  /* i */) GCC_NORETURN;
 extern void VisualBell (void);
 extern void do_dcs (XtermWidget /* xw */, Char * /* buf */, size_t  /* len */);
-extern void do_osc (XtermWidget /* xw */, Char * /* buf */, unsigned  /* len */, int  /* final */);
+extern void do_osc (XtermWidget /* xw */, Char * /* buf */, size_t  /* len */, int  /* final */);
 extern void do_xevents (void);
 extern void end_tek_mode (void);
 extern void end_vt_mode (void);
@@ -996,6 +998,19 @@ extern void HandleIconify              PROTO_XT_ACTIONS_ARGS;
 extern void HandleMaximize             PROTO_XT_ACTIONS_ARGS;
 extern void HandleRestoreSize          PROTO_XT_ACTIONS_ARGS;
 extern void RequestMaximize (XtermWidget  /* termw */, int  /* maximize */);
+#endif
+
+#if OPT_SCROLL_LOCK
+extern void GetScrollLock (TScreen * /* screen */);
+extern void HandleScrollLock           PROTO_XT_ACTIONS_ARGS;
+extern void ShowScrollLock (TScreen * /* screen */, Bool /* enable */);
+extern void SetScrollLock (TScreen * /* screen */, Bool /* enable */);
+extern void xtermShowLED (TScreen * /* screen */, Cardinal /* led_number */, Bool /* enable */);
+extern void xtermClearLEDs (TScreen * /* screen */);
+#else
+#define ShowScrollLock(screen, enable) /* nothing */
+#define SetScrollLock(screen, enable) /* nothing */
+#define GetScrollLock(screen) /* nothing */
 #endif
 
 #if OPT_WIDE_CHARS
@@ -1081,7 +1096,7 @@ extern void ScrnInsertChar (XtermWidget /* xw */, unsigned  /* n */);
 extern void ScrnInsertLine (XtermWidget /* xw */, ScrnBuf /* sb */, int  /* last */, int  /* where */, unsigned  /* n */);
 extern void ScrnRefresh (XtermWidget /* xw */, int  /* toprow */, int  /* leftcol */, int  /* nrows */, int  /* ncols */, Bool  /* force */);
 extern void ScrnUpdate (XtermWidget /* xw */, int  /* toprow */, int  /* leftcol */, int  /* nrows */, int  /* ncols */, Bool  /* force */);
-extern void ScrnWriteText (XtermWidget /* xw */, IChar * /* str */, unsigned  /* flags */, CellColor /* cur_fg_bg */, unsigned  /* length */);
+extern void ScrnWriteText (XtermWidget /* xw */, IChar * /* str */, unsigned  /* flags */, unsigned /* cur_fg_bg */, unsigned  /* length */);
 extern void setupLineData (TScreen * /* screen */, ScrnBuf /* base */, Char * /* data */, unsigned /* nrow */, unsigned /* ncol */);
 extern void xtermParseRect (XtermWidget /* xw */, int, int *, XTermRect *);
 
@@ -1149,7 +1164,7 @@ extern void ScrollBarOff (XtermWidget  /* xw */);
 extern void ScrollBarOn (XtermWidget  /* xw */, Bool /* init */);
 extern void ScrollBarReverseVideo (Widget  /* scrollWidget */);
 extern void ToggleScrollBar (XtermWidget  /* xw */);
-extern void WindowScroll (XtermWidget /* xw */, int  /* top */);
+extern void WindowScroll (XtermWidget /* xw */, int  /* top */, Bool /* always */);
 
 #ifdef SCROLLBAR_RIGHT
 extern void updateRightScrollbar(XtermWidget  /* xw */);
@@ -1168,7 +1183,7 @@ extern void TabZonk (Tabs  /* tabs */);
 /* util.c */
 extern Boolean isDefaultBackground(const char * /* name */);
 extern Boolean isDefaultForeground(const char * /* name */);
-extern GC updatedXtermGC (XtermWidget /* xw */, unsigned  /* flags */, CellColor /* fg_bg */, Bool  /* hilite */);
+extern GC updatedXtermGC (XtermWidget /* xw */, unsigned  /* flags */, unsigned /* fg_bg */, Bool  /* hilite */);
 extern int AddToRefresh (XtermWidget /* xw */);
 extern int ClearInLine (XtermWidget /* xw */, int /* row */, int /* col */, unsigned /* len */);
 extern int HandleExposure (XtermWidget /* xw */, XEvent * /* event */);
@@ -1186,7 +1201,7 @@ extern void RevScroll (XtermWidget /* xw */, int  /* amount */);
 extern void ReverseVideo (XtermWidget  /* termw */);
 extern void WriteText (XtermWidget /* xw */, IChar * /* str */, Cardinal /* len */);
 extern void decode_keyboard_type (XtermWidget /* xw */, struct XTERM_RESOURCE * /* rp */);
-extern void decode_wcwidth (int  /* mode */, int /* samplesize */, int /* samplepass */);
+extern void decode_wcwidth (XtermWidget  /* xw */);
 extern void do_erase_display (XtermWidget /* xw */, int  /* param */, int  /* mode */);
 extern void do_erase_line (XtermWidget /* xw */, int  /* param */, int  /* mode */);
 extern void getXtermSizeHints (XtermWidget /* xw */);
@@ -1204,8 +1219,8 @@ extern void xtermSizeHints (XtermWidget  /* xw */, int /* scrollbarWidth */);
 
 #if OPT_ISO_COLORS
 
-extern unsigned extract_fg (XtermWidget /* xw */, CellColor  /* color */, unsigned  /* flags */);
-extern unsigned extract_bg (XtermWidget /* xw */, CellColor  /* color */, unsigned  /* flags */);
+extern unsigned extract_fg (XtermWidget /* xw */, unsigned  /* color */, unsigned  /* flags */);
+extern unsigned extract_bg (XtermWidget /* xw */, unsigned  /* color */, unsigned  /* flags */);
 extern CellColor makeColorPair (int  /* fg */, int  /* bg */);
 extern void ClearCurBackground (XtermWidget /* xw */, int  /* top */, int  /* left */, unsigned  /* height */, unsigned  /* width */);
 
@@ -1251,7 +1266,7 @@ extern Pixel xtermGetColorRes(XtermWidget /* xw */, ColorRes * /* res */);
 	 && (screen->veryBoldColors & attr) == 0 \
 	 && (flags & attr) != 0 \
 	 && (fg == code)) \
-		 flags &= ~(attr)
+		 UIntClr(flags, attr)
 
 #define checkVeryBoldColors(flags, fg) \
 	checkVeryBoldAttr(flags, fg, COLOR_RV, INVERSE); \
@@ -1325,6 +1340,9 @@ unsigned visual_width(IChar * /* str */, Cardinal  /* len */);
 
 #define BtoS(b)    (((b) == Maybe) ? "maybe" : ((b) ? "on" : "off"))
 #define NonNull(s) ((s) ? (s) : "<null>")
+
+#define UIntSet(dst,bits) dst = dst | (unsigned) (bits)
+#define UIntClr(dst,bits) dst = dst & (unsigned) ~(bits)
 
 #ifdef __cplusplus
 	}
