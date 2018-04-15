@@ -1,4 +1,4 @@
-/* $XTermId: fontutils.c,v 1.361 2011/07/17 22:26:05 tom Exp $ */
+/* $XTermId: fontutils.c,v 1.366 2011/08/31 01:03:09 tom Exp $ */
 
 /************************************************************
 
@@ -52,6 +52,9 @@ authorization.
 
 #include <stdio.h>
 #include <ctype.h>
+
+#define SetFontWidth(screen,dst,src)  (dst)->f_width = (src)
+#define SetFontHeight(screen,dst,src) (dst)->f_height = (int)((screen)->scale_height * (float) (src))
 
 /* from X11/Xlibint.h - not all vendors install this file */
 #define CI_NONEXISTCHAR(cs) (((cs)->width == 0) && \
@@ -1309,8 +1312,11 @@ sameSubResources(SubResourceRec * a, SubResourceRec * b)
 
     if (!SAME_MEMBER(default_font.f_n)
 	|| !SAME_MEMBER(default_font.f_b)
+#if OPT_WIDE_CHARS
 	|| !SAME_MEMBER(default_font.f_w)
-	|| !SAME_MEMBER(default_font.f_wb)) {
+	|| !SAME_MEMBER(default_font.f_wb)
+#endif
+	) {
 	TRACE(("sameSubResources: default_font differs\n"));
 	result = False;
     } else {
@@ -1560,12 +1566,13 @@ xtermSetCursorBox(TScreen * screen)
 
 #define CACHE_XFT(dst,src) if (src != 0) {\
 	    checkXft(xw, &(dst[fontnum]), src);\
-	    TRACE(("Xft metrics %s[%d] = %d (%d,%d) advance %d, actual %d%s\n",\
+	    TRACE(("Xft metrics %s[%d] = %d (%d,%d)%s advance %d, actual %d%s\n",\
 		#dst,\
 	    	fontnum,\
 		src->height,\
 		src->ascent,\
 		src->descent,\
+		((src->ascent + src->descent) > src->height ? "*" : ""),\
 		src->max_advance_width,\
 		dst[fontnum].map.min_width,\
 		dst[fontnum].map.mixed ? " mixed" : ""));\
@@ -1776,8 +1783,8 @@ setRenderFontsize(TScreen * screen, VTwin * win, XftFont * font, const char *tag
 	    width >>= 1;
 	}
 	if (tag == 0) {
-	    win->f_width = width;
-	    win->f_height = height;
+	    SetFontWidth(screen, win, width);
+	    SetFontHeight(screen, win, height);
 	    win->f_ascent = ascent;
 	    win->f_descent = descent;
 	    TRACE(("setRenderFontsize result %dx%d (%d+%d)\n",
@@ -1791,8 +1798,8 @@ setRenderFontsize(TScreen * screen, VTwin * win, XftFont * font, const char *tag
 		   win->f_width, win->f_height, win->f_ascent, win->f_descent,
 		   width, height, ascent, descent));
 
-	    win->f_width = width;
-	    win->f_height = height;
+	    SetFontWidth(screen, win, width);
+	    SetFontHeight(screen, win, height);
 	    win->f_ascent = ascent;
 	    win->f_descent = descent;
 	} else {
@@ -2101,8 +2108,8 @@ xtermComputeFontInfo(XtermWidget xw,
 
 	    if (screen->force_packed) {
 		XTermXftFonts *use = &(screen->renderFontNorm[fontnum]);
-		win->f_height = use->font->ascent + use->font->descent;
-		win->f_width = use->map.min_width;
+		SetFontHeight(screen, win, use->font->ascent + use->font->descent);
+		SetFontWidth(screen, win, use->map.min_width);
 		TRACE(("...packed TrueType font %dx%d vs %d\n",
 		       win->f_height,
 		       win->f_width,
@@ -2119,11 +2126,11 @@ xtermComputeFontInfo(XtermWidget xw,
 #endif /* OPT_RENDERFONT */
     {
 	if (is_double_width_font(font) && !(screen->fnt_prop)) {
-	    win->f_width = (font->min_bounds.width);
+	    SetFontWidth(screen, win, font->min_bounds.width);
 	} else {
-	    win->f_width = (font->max_bounds.width);
+	    SetFontWidth(screen, win, font->max_bounds.width);
 	}
-	win->f_height = (font->ascent + font->descent);
+	SetFontHeight(screen, win, font->ascent + font->descent);
 	win->f_ascent = font->ascent;
 	win->f_descent = font->descent;
     }

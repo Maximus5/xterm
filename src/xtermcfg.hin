@@ -1,8 +1,8 @@
-/* $XTermId: xtermcfg.hin,v 1.182 2010/11/11 01:14:49 tom Exp $ */
+/* $XTermId: xtermcfg.hin,v 1.184 2011/09/04 21:14:13 tom Exp $ */
 
 /************************************************************
 
-Copyright 1997-2009,2010 by Thomas E. Dickey
+Copyright 1997-2010,2011 by Thomas E. Dickey
 
                         All Rights Reserved
 
@@ -56,6 +56,7 @@ authorization.
 #undef HAVE_LIB_XAW		/* CF_X_ATHENA */
 #undef HAVE_LIB_XAW3D		/* CF_X_ATHENA(--with-Xaw3d) */
 #undef HAVE_LIB_XAWPLUS		/* CF_X_ATHENA(--with-XawPlus) */
+#undef HAVE_NCURSES_CURSES_H	/* AC_CHECK_HEADERS(ncurses/curses.h) */
 #undef HAVE_NCURSES_TERM_H	/* AC_CHECK_HEADERS(ncurses/term.h) */
 #undef HAVE_PATHS_H		/* CF_LASTLOG */
 #undef HAVE_PCREPOSIX_H		/* CF_WITH_PCRE */
@@ -76,6 +77,7 @@ authorization.
 #undef HAVE_TIGETSTR		/* AC_CHECK_FUNCS(tigetstr) */
 #undef HAVE_UNISTD_H		/* AC_CHECK_HEADERS(unistd.h) */
 #undef HAVE_USE_EXTENDED_NAMES	/* AC_CHECK_FUNCS(use_extended_names) */
+#undef HAVE_UNSETENV		/* AC_CHECK_FUNCS(unsetenv) */
 #undef HAVE_UTMP		/* CF_UTMP */
 #undef HAVE_UTMP_UT_HOST	/* CF_UTMP_UT_HOST */
 #undef HAVE_UTMP_UT_SESSION	/* CF_UTMP_UT_SESSION */

@@ -1,4 +1,4 @@
-/* $XTermId: xterm.h,v 1.656 2011/08/20 00:20:20 tom Exp $ */
+/* $XTermId: xterm.h,v 1.659 2011/09/04 16:40:28 tom Exp $ */
 
 /************************************************************
 
@@ -476,6 +476,7 @@ extern char **environ;
 #define XtNreverseWrap		"reverseWrap"
 #define XtNrightScrollBar	"rightScrollBar"
 #define XtNsaveLines		"saveLines"
+#define XtNscaleHeight		"scaleHeight"
 #define XtNscrollBar		"scrollBar"
 #define XtNscrollBarBorder	"scrollBarBorder"
 #define XtNscrollKey		"scrollKey"
@@ -640,6 +641,7 @@ extern char **environ;
 #define XtCReverseWrap		"ReverseWrap"
 #define XtCRightScrollBar	"RightScrollBar"
 #define XtCSaveLines		"SaveLines"
+#define XtCScaleHeight		"ScaleHeight"
 #define XtCScrollBar		"ScrollBar"
 #define XtCScrollBarBorder	"ScrollBarBorder"
 #define XtCScrollCond		"ScrollCond"
@@ -951,6 +953,7 @@ extern Cursor make_colored_cursor (unsigned /* cursorindex */, unsigned long  /*
 extern OptionHelp * sortedOpts(OptionHelp *, XrmOptionDescRec *, Cardinal);
 extern Widget xtermOpenApplication(XtAppContext * /* app_context_return */, String /* application_class */, XrmOptionDescRec */* options */, Cardinal /* num_options */, int * /* argc_in_out */, String */* argv_in_out */, String * /* fallback_resources */, WidgetClass /* widget_class */, ArgList /* args */, Cardinal /* num_args */);
 extern Window WMFrameWindow(XtermWidget /* termw */);
+extern XtInputMask xtermAppPending (void);
 extern XrmOptionDescRec * sortedOptDescs(XrmOptionDescRec *, Cardinal);
 extern XtermWidget getXtermWidget(Widget /* w */);
 extern char *udk_lookup (int /* keycode */, int * /* len */);
@@ -1009,6 +1012,7 @@ extern void xtermDisplayCursor (XtermWidget /* xw */);
 extern void xtermEmbedWindow(Window /* winToEmbedInfo */);
 extern void xtermSetenv (const char * /* var */, const char * /* value */);
 extern void xtermShowPointer (XtermWidget /* xw */, Bool /* enable */);
+extern void xtermUnsetenv (const char * /* var */);
 
 #if OPT_DABBREV
 extern void HandleDabbrevExpand        PROTO_XT_ACTIONS_ARGS;
