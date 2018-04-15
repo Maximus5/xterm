@@ -1,4 +1,4 @@
-dnl $XTermId: aclocal.m4,v 1.373 2014/04/14 19:16:55 tom Exp $
+dnl $XTermId: aclocal.m4,v 1.376 2014/07/13 18:36:02 tom Exp $
 dnl
 dnl ---------------------------------------------------------------------------
 dnl
@@ -58,7 +58,7 @@ AC_DEFUN([AM_LANGINFO_CODESET],
   fi
 ])dnl
 dnl ---------------------------------------------------------------------------
-dnl CF_ACVERSION_CHECK version: 4 updated: 2013/03/04 19:52:56
+dnl CF_ACVERSION_CHECK version: 5 updated: 2014/06/04 19:11:49
 dnl ------------------
 dnl Conditionally generate script according to whether we're using a given autoconf.
 dnl
@@ -67,7 +67,7 @@ dnl $2 = code to use if AC_ACVERSION is at least as high as $1.
 dnl $3 = code to use if AC_ACVERSION is older than $1.
 define([CF_ACVERSION_CHECK],
 [
-ifdef([AC_ACVERSION], ,[m4_copy([m4_PACKAGE_VERSION],[AC_ACVERSION])])dnl
+ifdef([AC_ACVERSION], ,[ifdef([AC_AUTOCONF_VERSION],[m4_copy([AC_AUTOCONF_VERSION],[AC_ACVERSION])],[m4_copy([m4_PACKAGE_VERSION],[AC_ACVERSION])])])dnl
 ifdef([m4_version_compare],
 [m4_if(m4_version_compare(m4_defn([AC_ACVERSION]), [$1]), -1, [$3], [$2])],
 [CF_ACVERSION_COMPARE(
@@ -180,13 +180,31 @@ dnl $1 = library to add, without the "-l"
 dnl $2 = variable to update (default $LIBS)
 AC_DEFUN([CF_ADD_LIB],[CF_ADD_LIBS(-l$1,ifelse($2,,LIBS,[$2]))])dnl
 dnl ---------------------------------------------------------------------------
-dnl CF_ADD_LIBS version: 1 updated: 2010/06/02 05:03:05
+dnl CF_ADD_LIBS version: 2 updated: 2014/07/13 14:33:27
 dnl -----------
-dnl Add one or more libraries, used to enforce consistency.
+dnl Add one or more libraries, used to enforce consistency.  Libraries are
+dnl prepended to an existing list, since their dependencies are assumed to
+dnl already exist in the list.
 dnl
 dnl $1 = libraries to add, with the "-l", etc.
 dnl $2 = variable to update (default $LIBS)
-AC_DEFUN([CF_ADD_LIBS],[ifelse($2,,LIBS,[$2])="$1 [$]ifelse($2,,LIBS,[$2])"])dnl
+AC_DEFUN([CF_ADD_LIBS],[
+cf_add_libs="$1"
+# Filter out duplicates - this happens with badly-designed ".pc" files...
+for cf_add_1lib in [$]ifelse($2,,LIBS,[$2])
+do
+	for cf_add_2lib in $cf_add_libs
+	do
+		if test "x$cf_add_1lib" = "x$cf_add_2lib"
+		then
+			cf_add_1lib=
+			break
+		fi
+	done
+	test -n "$cf_add_1lib" && cf_add_libs="$cf_add_libs $cf_add_1lib"
+done
+ifelse($2,,LIBS,[$2])="$cf_add_libs"
+])dnl
 dnl ---------------------------------------------------------------------------
 dnl CF_ADD_LIB_AFTER version: 3 updated: 2013/07/09 21:27:22
 dnl ----------------
@@ -1841,7 +1859,7 @@ done
 ])
 ])dnl
 dnl ---------------------------------------------------------------------------
-dnl CF_PROG_CC version: 3 updated: 2012/10/06 15:31:55
+dnl CF_PROG_CC version: 4 updated: 2014/07/12 18:57:58
 dnl ----------
 dnl standard check for CC, plus followup sanity checks
 dnl $1 = optional parameter to pass to AC_PROG_CC to specify compiler name
@@ -1851,7 +1869,7 @@ CF_GCC_VERSION
 CF_ACVERSION_CHECK(2.52,
 	[AC_PROG_CC_STDC],
 	[CF_ANSI_CC_REQD])
-CF_CC_ENV_FLAGS 
+CF_CC_ENV_FLAGS
 ])dnl
 dnl ---------------------------------------------------------------------------
 dnl CF_PROG_GROFF version: 1 updated: 2013/01/02 20:37:18
@@ -3284,11 +3302,11 @@ AC_SUBST(ICON_SYMLINK)
 AC_MSG_RESULT($ICON_SYMLINK)
 ])dnl
 dnl ---------------------------------------------------------------------------
-dnl CF_WITH_ICON_THEME version: 9 updated: 2013/04/17 05:31:24
+dnl CF_WITH_ICON_THEME version: 10 updated: 2014/07/12 18:57:58
 dnl ------------------
 dnl If asked, check for prerequisites and setup symbols to permit installing
 dnl one or more application icons in the Red Hat icon-theme directory
-dnl hierarchy. 
+dnl hierarchy.
 dnl
 dnl If the prerequisites are missing, give a warning and revert to the long-
 dnl standing pixmaps directory.
@@ -3871,7 +3889,7 @@ make an error
 fi
 ])
 dnl ---------------------------------------------------------------------------
-dnl CF_X_ATHENA version: 21 updated: 2013/07/06 21:27:06
+dnl CF_X_ATHENA version: 22 updated: 2014/07/12 18:57:58
 dnl -----------
 dnl Check for Xaw (Athena) libraries
 dnl
@@ -3886,6 +3904,17 @@ AC_ARG_WITH(Xaw3d,
 	[  --with-Xaw3d            link with Xaw 3d library])
 if test "$withval" = yes ; then
 	cf_x_athena=Xaw3d
+	AC_MSG_RESULT(yes)
+else
+	AC_MSG_RESULT(no)
+fi
+
+AC_MSG_CHECKING(if you want to link with Xaw 3d xft library)
+withval=
+AC_ARG_WITH(Xaw3dxft,
+	[  --with-Xaw3dxft         link with Xaw 3d xft library])
+if test "$withval" = yes ; then
+	cf_x_athena=Xaw3dxft
 	AC_MSG_RESULT(yes)
 else
 	AC_MSG_RESULT(no)
@@ -4280,14 +4309,27 @@ AC_SUBST(HAVE_TYPE_FCCHAR32)
 AC_SUBST(HAVE_TYPE_XFTCHARSPEC)
 ])
 dnl ---------------------------------------------------------------------------
-dnl CF_X_TOOLKIT version: 21 updated: 2012/10/04 06:57:36
+dnl CF_X_TOOLKIT version: 22 updated: 2014/07/13 14:33:27
 dnl ------------
 dnl Check for X Toolkit libraries
-dnl
 AC_DEFUN([CF_X_TOOLKIT],
 [
 AC_REQUIRE([AC_PATH_XTRA])
 AC_REQUIRE([CF_CHECK_CACHE])
+
+# OSX is schizoid about who owns /usr/X11 (old) versus /opt/X11 (new), and (and
+# in some cases has installed dummy files in the former, other cases replaced
+# it with a link to the new location).  This complicates the configure script. 
+# Check for that pitfall, and recover using pkg-config
+#
+# If none of these are set, the configuration is almost certainly broken.
+if test -z "${X_CFLAGS}${X_PRE_LIBS}${X_LIBS}${X_EXTRA_LIBS}"
+then
+	CF_TRY_PKG_CONFIG(x11,,[AC_MSG_WARN(unable to find X11 library)])
+	CF_TRY_PKG_CONFIG(ice,,[AC_MSG_WARN(unable to find ICE library)])
+	CF_TRY_PKG_CONFIG(sm,,[AC_MSG_WARN(unable to find SM library)])
+	CF_TRY_PKG_CONFIG(xt,,[AC_MSG_WARN(unable to find Xt library)])
+fi
 
 cf_have_X_LIBS=no
 

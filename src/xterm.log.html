@@ -30,7 +30,7 @@
  * sale, use or other dealings in this Software without prior written        *
  * authorization.                                                            *
  *****************************************************************************
-  $XTermId: xterm.log.html,v 1.1493 2014/06/20 00:05:20 tom Exp $
+  $XTermId: xterm.log.html,v 1.1504 2014/07/13 21:58:07 tom Exp $
   -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 
@@ -72,6 +72,8 @@
   CHANGELOG</a>).</p>
 
   <ul>
+    <li><a href="#xterm_309">Patch #309 - 2014/07/13</a></li>
+
     <li><a href="#xterm_308">Patch #308 - 2014/06/19</a></li>
 
     <li><a href="#xterm_307">Patch #307 - 2014/06/17</a></li>
@@ -901,6 +903,28 @@
     <li><a href="#xterm_01">Patch #1 - 1996/1/6</a></li>
   </ul>
 
+  <h1><a name="xterm_309" id="xterm_309">Patch #309 -
+  2014/07/13</a></h1>
+
+  <ul>
+    <li>modify configure script to work around debris left by
+    XQuartz upgrades.</li>
+
+    <li>modify test-package scripts to enable ReGIS graphics.</li>
+
+    <li>improvements/additions to ReGIS graphics, e.g., drawing
+    text (Ross Comb).</li>
+
+    <li>add <code>--with-Xaw3dxft</code>, to link with Xaw 3d xft
+    library (Stephen P Wall).</li>
+
+    <li>amend reset for cursor-shape to take into account
+    <code>cursorUnderline</code> resource (report by Christian
+    Weisgerber).</li>
+
+    <li>update config.guess, config.sub</li>
+  </ul>
+
   <h1><a name="xterm_308" id="xterm_308">Patch #308 -
   2014/06/19</a></h1>
 
@@ -1017,7 +1041,7 @@
       </ul>
     </li>
 
-    <li>additional changes for ReGIS support (patch by Ross Combs):
+    <li>additional changes for ReGIS support (Ross Combs):
 
       <ul>
         <li>fix some arc drawing bugs and add support for pattern
@@ -1081,7 +1105,7 @@
     <li>reduce bss storage used for ReGIS/Sixel modules, as well as
     cleanup storage usage in other modules.</li>
 
-    <li>initial changes for ReGIS support (patch by Ross Combs):
+    <li>initial changes for ReGIS support (Ross Combs):
 
       <ul>
         <li>document control-sequences</li>
@@ -1374,8 +1398,7 @@
   2013/07/10</a></h1>
 
   <ul>
-    <li>improve experimental sixel feature (patch by Ross
-    Combs).</li>
+    <li>improve experimental sixel feature (Ross Combs).</li>
 
     <li>modify delimiter in configure macro used to add a library
     after a given library to avoid confusion with <code>-Wl</code>
@@ -1422,7 +1445,7 @@
     <li>add configure option
     <code>--enable-sixel-graphics</code></li>
 
-    <li>add experimental support for sixel graphics (patch by Ross
+    <li>add experimental support for sixel graphics (Ross
     Combs).</li>
   </ul>
 
@@ -7344,10 +7367,10 @@ Klanderman).
     &lt;jrh@vicor-nb.com&gt;).</li>
 
     <li>define escape sequences for function keys F21-F35 (patch by
-    Steve Wall).</li>
+    Stephen P Wall).</li>
 
     <li>change the colors for the 256-color model, making them less
-    skewed toward black (patch by Steve Wall).</li>
+    skewed toward black (patch by Stephen P Wall).</li>
 
     <li>add <code>vt100Graphics</code> resource (see <a href=
     "#xterm_115">patch #115</a>, based on discussion with Glenn
@@ -7631,7 +7654,7 @@ Klanderman).
 
     <li>modify xterm to obtain the closest matching color if an
     exact color is not available, e.g., on 8-bit displays (patch by
-    Steve Wall)</li>
+    Stephen P Wall)</li>
 
     <li>implement "OverTheSpot" preedit type of XIM input (patch by
     Tomohiro Kubota):
@@ -8456,7 +8479,7 @@ Klanderman).
     8-bit character sets and UTF-8.</li>
 
     <li>fixes/improvements to OPT_TCAP_QUERY logic (patches by Bram
-    Moolenaar, Steve Wall).</li>
+    Moolenaar, Stephen P Wall).</li>
   </ul>
 
   <h1><a name="xterm_140" id="xterm_140">Patch #140 - 2000/7/23 -
@@ -8535,7 +8558,7 @@ Klanderman).
     <code>sunFunctionKeys</code> to work around redefinition of the
     token <code>sun</code> by xrdb on Solaris. Similarly, renamed
     resource <code>sun&nbsp;keyboard</code> to
-    <code>sunKeyboard</code> (Steve Wall).</li>
+    <code>sunKeyboard</code> (Stephen P Wall).</li>
 
     <li>change similar resource names for HP and SCO to avoid
     potential conflict with xrdb symbols on other systems, as well
@@ -8627,7 +8650,7 @@ Klanderman).
     features for the latter which require <code>sco</code> to be
     predefined.</li>
 
-    <li>patches from Steve Wall:
+    <li>patches from Stephen P Wall:
 
       <ul>
         <li>add support for two Sun-specific function keys. These
@@ -9230,7 +9253,7 @@ Klanderman).
     <code>resize</code> work properly.</li>
 
     <li>fix some typography in ctlseqs.ms description of DEC
-    locator events (reported by Steve Wall).</li>
+    locator events (reported by Stephen P Wall).</li>
   </ul>
 
   <h1><a name="xterm_117" id="xterm_117">Patch #117 - 1999/9/29 -
@@ -9256,8 +9279,8 @@ Klanderman).
     told that the next Cygnus release will drop that symbol in
     their next release).</li>
 
-    <li>minor cleanup of ifdef's for makeColorPair (patch by Steve
-    Wall).</li>
+    <li>minor cleanup of ifdef's for makeColorPair (patch by
+    Stephen P Wall).</li>
 
     <li>work around problem observed in XFree86 3.3.5 (patch by
     Alexander V Lukyanov, Redhat #5419). From the problem report:
@@ -9304,7 +9327,7 @@ Klanderman).
     IRIX winterm provides this option).</li>
 
     <li>add support for DEC Locator control sequences for xterm
-    (integrated patch by Steve Wall):
+    (integrated patch by Stephen P Wall):
       <pre>
                 DECEFR, "Enable Filter Rectangle"
                 DECELR, "Enable Locator Reports"
@@ -9346,12 +9369,13 @@ Klanderman).
   XFree86 3.9.16a</a></h1>
 
   <ul>
-    <li>integrated changes by Steve Wall to implement an 88-color
-    model for systems where 256-colors cannot be allocated.</li>
+    <li>integrated changes by Stephen P Wall to implement an
+    88-color model for systems where 256-colors cannot be
+    allocated.</li>
 
     <li>when 256-color configuration is compiled, colored bold and
     underlining is not available; ifdef'd to avoid possible odd
-    effects in this case (reported by Steve Wall).</li>
+    effects in this case (reported by Stephen P Wall).</li>
 
     <li>add resource <em>cacheDoublesize</em>, to limit the caching
     of font information for double-sized characters. This addresses
