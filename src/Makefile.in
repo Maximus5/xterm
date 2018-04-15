@@ -1,4 +1,4 @@
-## $XTermId: Makefile.in,v 1.219 2013/05/27 19:39:59 tom Exp $
+## $XTermId: Makefile.in,v 1.223 2013/06/23 23:40:18 tom Exp $
 # -----------------------------------------------------------------------------
 # this file is part of xterm
 #
@@ -63,7 +63,7 @@ EXTRA_CFLAGS	= @EXTRA_CFLAGS@
 EXTRA_CPPFLAGS	= @EXTRA_CPPFLAGS@
 EXTRA_LOADFLAGS	= @IMAKE_LOADFLAGS@
 
-CPPFLAGS	= -I. -I$(srcdir) -DHAVE_CONFIG_H @CPPFLAGS@ $(EXTRA_CPPFLAGS)
+CPPFLAGS	= -I. -I$(srcdir) -DHAVE_CONFIG_H @CPPFLAGS@ -DDEFCLASS=\"@APP_CLASS@\" $(EXTRA_CPPFLAGS)
 CFLAGS		= @CFLAGS@ $(EXTRA_CFLAGS)
 LDFLAGS		= @LDFLAGS@ @EXTRA_LDFLAGS@
 LIBS		= @LIBS@

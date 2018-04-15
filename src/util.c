@@ -1,4 +1,4 @@
-/* $XTermId: util.c,v 1.601 2013/05/09 01:00:59 tom Exp $ */
+/* $XTermId: util.c,v 1.604 2013/06/23 15:28:35 tom Exp $ */
 
 /*
  * Copyright 1999-2012,2013 by Thomas E. Dickey
@@ -72,6 +72,8 @@
 #endif
 #include <wcwidth.h>
 #endif
+
+#include <graphics.h>
 
 static int handle_translated_exposure(XtermWidget xw,
 				      int rect_x,
@@ -684,6 +686,8 @@ xtermScroll(XtermWidget xw, int amount)
 			   (unsigned) amount);
 	}
     }
+
+    scroll_displayed_graphics(amount);
 
     if (refreshheight > 0) {
 	ScrnRefresh(xw,
@@ -1485,6 +1489,8 @@ ClearAbove(XtermWidget xw)
 	    if ((height = screen->cur_row + top) > screen->max_row)
 		height = screen->max_row + 1;
 	    if ((height -= top) > 0) {
+		erase_displayed_graphics(screen, 0, top, MaxCols(screen), height);
+
 		ClearCurBackground(xw,
 				   top,
 				   0,
@@ -1523,6 +1529,11 @@ ClearBelow(XtermWidget xw)
 	    if (screen->scroll_amt)
 		FlushScroll(xw);
 	    if (++top <= screen->max_row) {
+		erase_displayed_graphics(screen,
+					 0,
+					 top,
+					 MaxCols(screen),
+					 (screen->max_row - top + 1));
 		ClearCurBackground(xw,
 				   top,
 				   0,
@@ -1749,6 +1760,11 @@ ClearScreen(XtermWidget xw)
     if ((top = INX2ROW(screen, 0)) <= screen->max_row) {
 	if (screen->scroll_amt)
 	    FlushScroll(xw);
+	erase_displayed_graphics(screen,
+				 0,
+				 top,
+				 MaxCols(screen),
+				 (screen->max_row - top + 1));
 	ClearCurBackground(xw,
 			   top,
 			   0,
@@ -2078,10 +2094,10 @@ HandleExposure(XtermWidget xw, XEvent * event)
 #ifndef NO_ACTIVE_ICON
     if (reply->window == screen->iconVwin.window) {
 	WhichVWin(screen) = &screen->iconVwin;
-	TRACE(("HandleExposure - icon"));
+	TRACE(("HandleExposure - icon\n"));
     } else {
 	WhichVWin(screen) = &screen->fullVwin;
-	TRACE(("HandleExposure - normal"));
+	TRACE(("HandleExposure - normal\n"));
     }
     TRACE((" event %d,%d %dx%d\n",
 	   reply->y,
@@ -3100,13 +3116,14 @@ int
 drawXtermText(XtermWidget xw,
 	      unsigned flags,
 	      GC gc,
-	      int x,
-	      int y,
+	      int start_x,
+	      int start_y,
 	      int chrset,
 	      IChar * text,
 	      Cardinal len,
 	      int on_wide)
 {
+    int x = start_x, y = start_y;
     TScreen *screen = TScreenOf(xw);
     Cardinal real_length = len;
     Cardinal underline_len = 0;
@@ -3421,7 +3438,10 @@ drawXtermText(XtermWidget xw,
 		      x + (int) underline_len * FontWidth(screen) - 1,
 		      y);
 	}
-	return x + (int) len *FontWidth(screen);
+
+	x += (int) len *FontWidth(screen);
+
+	return x;
     }
 #endif /* OPT_RENDERFONT */
     /*
@@ -3471,6 +3491,7 @@ drawXtermText(XtermWidget xw,
 			      gc, x + adj, y, chrset,
 			      text++, 1, on_wide) - adj;
 	}
+
 	return x;
     }
 #if OPT_BOX_CHARS
@@ -3812,7 +3833,8 @@ drawXtermText(XtermWidget xw,
 		  x, y, (x + (int) underline_len * font_width - 1), y);
     }
 
-    return x + (int) real_length *FontWidth(screen);
+    x += (int) real_length *FontWidth(screen);
+    return x;
 }
 
 #if OPT_WIDE_CHARS

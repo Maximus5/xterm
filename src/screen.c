@@ -1,4 +1,4 @@
-/* $XTermId: screen.c,v 1.477 2013/04/23 09:50:23 Bertram.Felgenhauer Exp $ */
+/* $XTermId: screen.c,v 1.483 2013/06/23 22:13:30 tom Exp $ */
 
 /*
  * Copyright 1999-2012,2013 by Thomas E. Dickey
@@ -58,7 +58,6 @@
 #include <xterm.h>
 #include <error.h>
 #include <data.h>
-#include <xcharmouse.h>
 #include <xterm_io.h>
 
 #include <X11/Xatom.h>
@@ -75,6 +74,8 @@
 #ifndef _Xconst
 #define _Xconst const		/* Solaris 7 workaround */
 #endif /* _Xconst */
+
+#include <graphics.h>
 
 #define inSaveBuf(screen, buf, inx) \
 	((buf) == (screen)->saveBuf_index && \
@@ -708,7 +709,7 @@ ChangeToWide(XtermWidget xw)
 #endif
 
 /*
- * Clear cells, no side-effects.
+ * Copy cells, no side-effects.
  */
 void
 CopyCells(TScreen * screen, LineData * src, LineData * dst, int col, int len)
@@ -835,7 +836,7 @@ ScrnWriteText(XtermWidget xw,
     unsigned n;
     unsigned real_width = visual_width(str, length);
 
-    (void) cur_fg_bg;
+    (void) cur_fg_bg;		/* quiet compiler warnings when unused */
 
     if (real_width + (unsigned) screen->cur_col > (unsigned) MaxCols(screen)) {
 	real_width = (unsigned) (MaxCols(screen) - screen->cur_col);
@@ -937,6 +938,15 @@ ScrnWriteText(XtermWidget xw,
     screen->last_written_row = screen->cur_row;
 #endif
 
+    TRACE(("text erasing cur_col=%d cur_row=%d real_width=%d\n",
+	   screen->cur_col,
+	   screen->cur_row,
+	   real_width));
+    erase_displayed_graphics(screen,
+			     screen->cur_col,
+			     screen->cur_row,
+			     (int) real_width, 1);
+
     if_OPT_XMC_GLITCH(screen, {
 	Resolve_XMC(xw);
     });
@@ -1007,6 +1017,17 @@ ScrnClearLines(XtermWidget xw, ScrnBuf sb, int where, unsigned n, unsigned size)
 #endif
 	base = ScrnBufAddr(base, jump);
     }
+
+    TRACE(("clear lines erasing where=%d screen->savelines=%d n=%d screen->max_col=%d\n",
+	   where,
+	   screen->savelines,
+	   n,
+	   screen->max_col));
+    erase_displayed_graphics(screen,
+			     where + screen->savelines,
+			     0,
+			     screen->max_col + 1,
+			     (int) n);
 }
 
 /*
@@ -1699,6 +1720,12 @@ ScrnRefresh(XtermWidget xw,
 	resetXtermGC(xw, flags, hilite);
     }
 
+    refresh_displayed_graphics(screen,
+			       leftcol,
+			       toprow + screen->topline,
+			       ncols,
+			       nrows);
+
     /*
      * If we're in color mode, reset the various GC's to the current
      * screen foreground and background so that other functions (e.g.,
@@ -2142,6 +2169,7 @@ ScreenResize(XtermWidget xw,
 	screen->fullVwin.height = height - border;
 	screen->fullVwin.width = width - border - screen->fullVwin.sb_info.width;
 
+	scroll_displayed_graphics(-move_down_by);
     } else if (FullHeight(screen) == height && FullWidth(screen) == width)
 	return (0);		/* nothing has changed at all */
 

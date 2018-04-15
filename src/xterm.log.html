@@ -30,7 +30,7 @@
  * sale, use or other dealings in this Software without prior written        *
  * authorization.                                                            *
  *****************************************************************************
-  $XTermId: xterm.log.html,v 1.1351 2013/05/28 00:01:55 tom Exp $
+  $XTermId: xterm.log.html,v 1.1361 2013/07/06 00:28:05 tom Exp $
   -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 
@@ -69,6 +69,8 @@
   CHANGELOG</a>).</p>
 
   <ul>
+    <li><a href="#xterm_294">Patch #294 - 2013/07/05</a></li>
+
     <li><a href="#xterm_293">Patch #293 - 2013/05/27</a></li>
 
     <li><a href="#xterm_292">Patch #292 - 2013/04/25</a></li>
@@ -868,6 +870,35 @@
     <li><a href="#xterm_01">Patch #1 - 1996/1/6</a></li>
   </ul>
 
+  <h1><a name="xterm_294" id="xterm_294">Patch #294 -
+  2013/07/05</a></h1>
+
+  <ul>
+    <li>add note in ctlseqs.ms for CPR response pointing out a
+    potential point of confusion with the string sent by a modified
+    F1 key (suggested by Bram Moolenaar).</li>
+
+    <li>improve <code>plink.sh</code> by checking if the linker
+    supports the <code>--as-needed</code> option (suggested by
+    David Philippi).</li>
+
+    <li>improve clearing for private mode 1049 when switching to
+    the alternate screen (Debian #711758).</li>
+
+    <li>amend fix from <a href="#xterm_292">patch #292</a> by
+    removing now-unneeded chunk which introduced problem in
+    selection (Debian #714527).</li>
+
+    <li>add definition to optionally override compiled-in class for
+    xterm from makefile, needed for test-packages.</li>
+
+    <li>add configure option
+    <code>--enable-sixel-graphics</code></li>
+
+    <li>add experimental support for sixel graphics (patch by Ross
+    Combs).</li>
+  </ul>
+
   <h1><a name="xterm_293" id="xterm_293">Patch #293 -
   2013/05/27</a></h1>
 
@@ -1001,8 +1032,8 @@
     by Peder Stray).</li>
 
     <li>fix inconsistent use of noreturn-attribute in
-    <code>Exit</code> function which interfered with analysis by
-    clang.</li>
+    <code>Exit</code> function which interfered with clang
+    --analyze.</li>
 
     <li>remove incorrect <code>free</code> used in computation of
     <code>XTERM_SHELL</code> variable, from Coverity fixes in
@@ -1127,9 +1158,9 @@
     <li>modify the handling of focus-change events to ignore those
     whose detail is <code>NotifyPointer</code>, since those are
     sent in addition to focus-change events directed to the old/new
-    windows having focus (prompted by patch by Balazs Kezes to
-    prevent the urgency-hint from being reset in this
-    scenario).</li>
+    windows having focus. In particular, this prevents the
+    urgency-hint from being reset inadvertantly (prompted by patch
+    by Balazs Kezes).</li>
 
     <li>modify description of <code>iconName</code> in manpage to
     make it clearer that this resource does not specify the
@@ -1219,7 +1250,7 @@
     existing uses of the <code>iconName</code> resource in the
     <code>Shell</code> widget (report by Emanuel Haupt).</li>
 
-    <li>fix documentation errata (reports by Miroslav Lichvar):
+    <li>fix documentation errata reported by Miroslav Lichvar:
 
       <ul>
         <li>correct manpage default for <code>allowTcapOps</code>
@@ -8528,7 +8559,7 @@ Klanderman).
     Smith).</li>
 
     <li>modify terminfo entry for <code>xterm-xfree86</code> to
-    reflect modifiers for shift and control which (from a patch by
+    reflect modifiers for shift and control (from a patch by
     Alexander V Lukyanov).</li>
 
     <li>modify terminfo entry for <code>xterm-sun</code> to match
