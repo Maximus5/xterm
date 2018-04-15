@@ -1,4 +1,4 @@
-dnl $XTermId: configure.in,v 1.312 2013/02/03 19:30:48 tom Exp $
+dnl $XTermId: configure.in,v 1.315 2013/04/21 19:30:21 Andres.Perera Exp $
 dnl
 dnl -----------------------------------------------------------------------------
 dnl this file is part of xterm
@@ -147,6 +147,14 @@ test -n "$with_symlink" && \
 	XTERM_SYMLINK="$with_symlink"
 fi
 
+AC_MSG_CHECKING(if you want to disable openpty)
+CF_ARG_DISABLE(openpty,
+	[  --disable-openpty       disable openpty, prefer other interfaces],
+	[disable_openpty=yes],
+	[disable_openpty=no],
+	no)
+AC_MSG_RESULT($disable_openpty)
+
 AC_MSG_CHECKING(if you want to disable setuid)
 CF_ARG_DISABLE(setuid,
 	[  --disable-setuid        disable setuid in xterm, do not install setuid/setgid],
@@ -281,7 +289,7 @@ CF_HELP_MESSAGE(Terminal Configuration:)
 
 AC_MSG_CHECKING(for default terminal-id)
 AC_ARG_WITH(terminal-id,
-	[  --with-terminal-id=V    set default decTerminalID (default: vt100)],
+	[  --with-terminal-id=V    set default decTerminalID (default: vt420)],
 	[default_termid=$withval],
 	[default_termid=vt420])
 AC_MSG_RESULT($default_termid)
@@ -302,12 +310,12 @@ AC_DEFINE_UNQUOTED(DFT_TERMTYPE,"$default_TERM",[default terminal-type])
 AC_SUBST(default_TERM)
 
 ###############################################################################
-AC_MSG_CHECKING(if backarrow-key should be DEL)
+AC_MSG_CHECKING(if backarrow-key should be BS)
 CF_ARG_DISABLE(backarrow-key,
 	[  --enable-backarrow-key  set default backarrowKey resource (default: true)],
-	[backarrow_is_del=$enableval],
-	[backarrow_is_del=yes])
-CF_XBOOL_RESULT(DEF_BACKARO_DEL,backarrow_is_del,[Define to 1 if backarrow-key should be DEL])
+	[backarrow_is_bs=$enableval],
+	[backarrow_is_bs=yes])
+CF_XBOOL_RESULT(DEF_BACKARO_BS,backarrow_is_bs,[Define to 1 if backarrow-key should be BS])
 
 AC_MSG_CHECKING(if backarrow-key should be treated as erase)
 CF_ARG_ENABLE(backarrow-is-erase,

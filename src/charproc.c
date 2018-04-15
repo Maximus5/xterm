@@ -1,4 +1,4 @@
-/* $XTermId: charproc.c,v 1.1283 2013/02/05 01:47:58 tom Exp $ */
+/* $XTermId: charproc.c,v 1.1287 2013/04/24 09:07:06 tom Exp $ */
 
 /*
  * Copyright 1999-2012,2013 by Thomas E. Dickey
@@ -390,6 +390,8 @@ static XtActionsRec actionsList[] = {
 
 static XtResource xterm_resources[] =
 {
+    Bres(XtNallowPasteControls, XtCAllowPasteControls,
+	 screen.allowPasteControls, False),
     Bres(XtNallowSendEvents, XtCAllowSendEvents, screen.allowSendEvent0, False),
     Bres(XtNallowColorOps, XtCAllowColorOps, screen.allowColorOp0, DEF_ALLOW_COLOR),
     Bres(XtNallowFontOps, XtCAllowFontOps, screen.allowFontOp0, DEF_ALLOW_FONT),
@@ -407,7 +409,7 @@ static XtResource xterm_resources[] =
     Bres(XtNautoWrap, XtCAutoWrap, misc.autoWrap, True),
     Bres(XtNawaitInput, XtCAwaitInput, screen.awaitInput, False),
     Bres(XtNfreeBoldBox, XtCFreeBoldBox, screen.free_bold_box, False),
-    Bres(XtNbackarrowKey, XtCBackarrowKey, screen.backarrow_key, DEF_BACKARO_DEL),
+    Bres(XtNbackarrowKey, XtCBackarrowKey, screen.backarrow_key, DEF_BACKARO_BS),
     Bres(XtNbellIsUrgent, XtCBellIsUrgent, screen.bellIsUrgent, False),
     Bres(XtNbellOnReset, XtCBellOnReset, screen.bellOnReset, True),
     Bres(XtNboldMode, XtCBoldMode, screen.bold_mode, True),
@@ -7427,6 +7429,7 @@ VTInitialize(Widget wrequest,
     init_Bres(screen.alt_sends_esc);
     init_Bres(screen.meta_sends_esc);
 
+    init_Bres(screen.allowPasteControls);
     init_Bres(screen.allowSendEvent0);
     init_Bres(screen.allowColorOp0);
     init_Bres(screen.allowFontOp0);
@@ -8011,8 +8014,8 @@ VTDestroy(Widget w GCC_UNUSED)
 	XtDestroyWidget(screen->scrollWidget);
     }
 #if OPT_FIFO_LINES
-    while (screen->saved_fifo-- > 0) {
-	deleteScrollback(screen, 0);
+    while (screen->saved_fifo > 0) {
+	deleteScrollback(screen);
     }
 #endif
     while (screen->save_title != 0) {

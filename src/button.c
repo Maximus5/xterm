@@ -1,4 +1,4 @@
-/* $XTermId: button.c,v 1.451 2013/02/06 09:56:15 tom Exp $ */
+/* $XTermId: button.c,v 1.454 2013/04/25 01:05:41 Taketo.Kabe Exp $ */
 
 /*
  * Copyright 1999-2012,2013 by Thomas E. Dickey
@@ -1963,6 +1963,50 @@ _WriteKey(TScreen * screen, const Char * in)
 }
 #endif /* OPT_READLINE */
 
+/*
+ * Unless enabled by the user, strip control characters other than formatting.
+ */
+static size_t
+removeControls(XtermWidget xw, char *value)
+{
+    TScreen *screen = TScreenOf(xw);
+    size_t dst = 0;
+    size_t src = 0;
+
+    if (screen->allowPasteControls) {
+	dst = strlen(value);
+    } else {
+	while ((value[dst] = value[src]) != '\0') {
+	    int ch = CharOf(value[src++]);
+	    if (ch < 32) {
+		switch (ch) {
+		case '\b':
+		case '\t':
+		case '\n':
+		case '\r':
+		    ++dst;
+		    break;
+		default:
+		    continue;
+		}
+	    }
+#if OPT_WIDE_CHARS
+	    else if (screen->utf8_inparse)
+		++dst;
+#endif
+#if OPT_C1_PRINT || OPT_WIDE_CHARS
+	    else if (screen->c1_printable)
+		++dst;
+#endif
+	    else if (ch >= 128 && ch < 160)
+		continue;
+	    else
+		++dst;
+	}
+    }
+    return dst;
+}
+
 /* SelectionReceived: stuff received selection text into pty */
 
 /* ARGSUSED */
@@ -2068,7 +2112,7 @@ SelectionReceived(Widget w,
 	}
 #endif
 	for (i = 0; i < text_list_count; i++) {
-	    size_t len = strlen(text_list[i]);
+	    size_t len = removeControls(xw, text_list[i]);
 	    if (screen->selectToBuffer) {
 		size_t have = (screen->internal_select
 			       ? strlen(screen->internal_select)
@@ -2839,7 +2883,6 @@ class_of(LineData * ld, CELL * cell)
 	temp.col /= 2;
     }
 #endif
-
     assert(temp.col < (int) ld->lineSize);
     return CharacterClass((int) (ld->charData[temp.col]));
 }
@@ -2874,6 +2917,10 @@ okPosition(TScreen * screen,
 	    *ld = GET_LINEDATA(screen, ++cell->row);
 	    result = False;
 	}
+    }
+    if (cell->col > screen->max_col) {
+	/* Clicked on rightmost edge of the screen. Clamp to max_col */
+	cell->col = screen->max_col;
     }
     return result;
 }
@@ -3300,6 +3347,13 @@ ComputeSelect(XtermWidget xw,
 		&& MoreRows(endSel)) {
 		screen->endSel.col = 0;
 		NextRow(endSel);
+	    }
+	    /* Clicking on right edge will make endSel.col == screen->max_col,
+	     * so clamp it. Otherwise XTERM_CELL and friends will fail assertion
+	     */
+	    if (screen->endSel.col > screen->max_col) {
+		screen->endSel.col = screen->max_col;
+		TRACE(("Select_WORD endSel.col clamped to %d\n", screen->endSel.col));
 	    }
 	}
 #if OPT_WIDE_CHARS
