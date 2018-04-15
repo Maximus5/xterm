@@ -1,4 +1,4 @@
-/* $XTermId: charproc.c,v 1.836 2008/02/29 01:55:13 tom Exp $ */
+/* $XTermId: charproc.c,v 1.842 2008/04/20 22:08:42 tom Exp $ */
 
 /*
 
@@ -614,6 +614,8 @@ static XtResource resources[] =
 	 keyboard.modify_1st.other_keys, 0),
     Ires(XtNmodifyStringKeys, XtCModifyStringKeys,
 	 keyboard.modify_1st.string_keys, 0),
+    Ires(XtNformatOtherKeys, XtCFormatOtherKeys,
+	 keyboard.format_keys, 0),
 #endif
 
 #if OPT_NUM_LOCK
@@ -2884,10 +2886,8 @@ VTparse(XtermWidget xw)
     myState.lastchar = -1;	/* not a legal IChar */
     myState.nextstate = -1;	/* not a legal state */
 
-    for (;;) {
-	if (!doparsing(xw, doinput(), &myState))
-	    return;
-    }
+    do {
+    } while (doparsing(xw, doinput(), &myState));
 }
 
 static Char *v_buffer;		/* pointer to physical buffer */
@@ -4003,6 +4003,28 @@ dpmodes(XtermWidget xw,
 	    set_bool_mode(screen->delete_is_del);
 	    update_delete_del();
 	    break;
+#if OPT_NUM_LOCK
+	case 1039:
+	    set_bool_mode(screen->alt_sends_esc);
+	    update_alt_esc();
+	    break;
+#endif
+	case 1040:
+	    set_bool_mode(screen->keepSelection);
+	    update_keepSelection();
+	    break;
+	case 1041:
+	    set_bool_mode(screen->selectToClipboard);
+	    update_selectToClipboard();
+	    break;
+	case 1042:
+	    set_bool_mode(screen->bellIsUrgent);
+	    update_bellIsUrgent();
+	    break;
+	case 1043:
+	    set_bool_mode(screen->poponbell);
+	    update_poponbell();
+	    break;
 	case 1048:
 	    if (!xw->misc.titeInhibit) {
 		if (IsSM())
@@ -4760,6 +4782,13 @@ SwitchBufs(XtermWidget xw)
     ScrnUpdate(xw, 0, 0, rows, MaxCols(screen), False);
 }
 
+Bool
+CheckBufPtrs(TScreen * screen)
+{
+    return (screen->visbuf != 0
+	    && screen->altbuf != 0);
+}
+
 /*
  * Swap buffer line pointers between alternate and regular screens.
  * visbuf contains pointers from allbuf or altbuf for the visible screen,
@@ -4770,11 +4799,13 @@ SwitchBufs(XtermWidget xw)
 void
 SwitchBufPtrs(TScreen * screen)
 {
-    size_t len = ScrnPointers(screen, (unsigned) MaxRows(screen));
+    if (CheckBufPtrs(screen)) {
+	size_t len = ScrnPointers(screen, (unsigned) MaxRows(screen));
 
-    memcpy((char *) screen->save_ptr, (char *) screen->visbuf, len);
-    memcpy((char *) screen->visbuf, (char *) screen->altbuf, len);
-    memcpy((char *) screen->altbuf, (char *) screen->save_ptr, len);
+	memcpy((char *) screen->save_ptr, (char *) screen->visbuf, len);
+	memcpy((char *) screen->visbuf, (char *) screen->altbuf, len);
+	memcpy((char *) screen->altbuf, (char *) screen->save_ptr, len);
+    }
 }
 
 void
@@ -4808,11 +4839,13 @@ VTRun(void)
 	Tpushb = Tpushback;
     }
 #endif
+    screen->is_running = True;
     if (!setjmp(VTend))
 	VTparse(term);
     StopBlinking(screen);
     HideCursor();
     screen->cursor_set = OFF;
+    TRACE(("... VTRun\n"));
 }
 
 /*ARGSUSED*/
@@ -5892,6 +5925,7 @@ VTInitialize(Widget wrequest,
     init_Ires(keyboard.modify_1st.keypad_keys);
     init_Ires(keyboard.modify_1st.other_keys);
     init_Ires(keyboard.modify_1st.string_keys);
+    init_Ires(keyboard.format_keys);
     wnew->keyboard.modify_now = wnew->keyboard.modify_1st;
 #endif
 
@@ -6338,13 +6372,17 @@ VTRealize(Widget w,
 
     screen->savedlines = 0;
 
-    if (xw->misc.scrollbar) {
-	screen->fullVwin.sb_info.width = 0;
-	ScrollBarOn(xw, False, True);
-    }
     for (i = 0; i < 2; ++i) {
 	screen->alternate = !screen->alternate;
 	CursorSave(xw);
+    }
+
+    /*
+     * Do this last, since it may change the layout via a resize.
+     */
+    if (xw->misc.scrollbar) {
+	screen->fullVwin.sb_info.width = 0;
+	ScrollBarOn(xw, False, True);
     }
     return;
 }

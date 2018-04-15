@@ -1,4 +1,4 @@
-/* $XTermId: ptyx.h,v 1.513 2008/02/25 00:05:13 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.515 2008/04/20 20:26:33 tom Exp $ */
 
 /*
  * Copyright 1999-2007,2008 by Thomas E. Dickey
@@ -1507,6 +1507,7 @@ typedef struct {
 	ScrnBuf		allbuf;		/* screen buffer (may include
 					   lines scrolled off top)	*/
 	Char		*sbuf_address;	/* main screen memory address   */
+	Boolean		is_running;	/* true when buffers are legal	*/
 	/*
 	 * Data for the alternate buffer.
 	 */
@@ -1836,6 +1837,7 @@ typedef struct
 #if OPT_MOD_FKEYS
     TModify modify_now;		/* current modifier value */
     TModify modify_1st;		/* original modifier value, for resets */
+    int format_keys;		/* format of modifyOtherKeys */
 #endif
 } TKeyboard;
 
