@@ -20,7 +20,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF   *
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.            *
  *****************************************************************************
-  $XTermId: xterm.log.html,v 1.600 2007/08/12 17:32:04 tom Exp $
+  $XTermId: xterm.log.html,v 1.630 2007/12/31 23:03:01 tom Exp $
   -->
 <HTML>
 <HEAD>
@@ -45,7 +45,8 @@ Most of these are summarized in the XFree86 CHANGELOG
 is the latest version of this file.
 
 <UL>
-<LI><A HREF="#xterm_229">Patch #229 - 2008/8/12</A>
+<LI><A HREF="#xterm_230">Patch #230 - 2007/12/31</A>
+<LI><A HREF="#xterm_229">Patch #229 - 2007/8/12</A>
 <LI><A HREF="#xterm_228">Patch #228 - 2007/7/22</A>
 <LI><A HREF="#xterm_227">Patch #227 - 2007/6/27</A>
 <LI><A HREF="#xterm_226">Patch #226 - 2007/6/17</A>
@@ -277,7 +278,119 @@ is the latest version of this file.
 <LI><A HREF="#xterm_01">Patch #1 - 1996/1/6</A>
 </UL>
 
-<H1><A NAME="xterm_229">Patch #229 - 2008/8/12</A></H1>
+<H1><A NAME="xterm_230">Patch #230 - 2007/12/31</A></H1>
+<ul>
+	<li>add <code>quietGrab</code> resource, which when true, suppresses
+	    cursor repainting when <code>NotifyGrab</code> and
+	    <code>NotifyUngrab</code> event types are received during
+	    change of focus (request by Nicolas George).
+
+	<li>do not treat Unicode BIDI control characters as combining
+	    characters (Debian #457634).
+
+	<li>add <code>koi8rxterm</code>, from Debian.
+
+	<li>add manpage for <code>uxterm</code>, from Debian (Ubuntu #128136,
+	    Debian #438645)
+
+	<li>remove ".xpm" suffixes from Icon filenames in desktop files since
+	    it confuses some lookups following the
+	    <a href="http://standards.freedesktop.org/icon-theme-spec/icon-theme-spec-latest.html">Icon Theme Specification</a>
+	    (report by Slava Semushin)
+
+	<li>correct width-calculation used for adjusting proportional fonts,
+	    to work with wide-characters (Debian #441354).
+
+	<li>fixes/improvements for double-size characters:
+	    <ul>
+	    <li>correct old clipping calculation which used total height of
+		glyphs where ascent was needed.
+
+	    <li>if bold font is unavailable, fall back to normal font
+
+	    <li>adjust to "work" with Xft (which does not support double-width
+		single-height characters). 
+
+	    <li>restore reset of doublesize for a line when it is cleared,
+	        broken in <a href="#xterm-228">patch #228</a>.
+	    </ul>
+
+	<li>modify logic for <code>forceBoxChars</code> resource when using
+	    TrueType fonts to be consistent with bitmap fonts
+
+	<li>modify logic for <code>forceBoxChars</code> resource to make the
+	    "Line-Drawing Characters" menu entry use xterm's line-drawing
+	    characters even asked to draw wide line-drawing characters which
+	    are available in the font.
+
+	<li>modify rectangle-support functions to preserve colors when
+	    filling/erasing (request by Enzo Toscano, to match WRQ Reflection
+	    behavior).
+
+	<li>add getopt-parsing to tcapquery.pl, including feature to test the
+	    extended cursor/editing keys.
+
+	<li>make missing double-width glyphs display as double-width
+	    (Debian #456236).
+
+	<li>change <code>tcap-fkeys</code> and <code>rectangles</code>
+	    configure options to enable them by default.
+
+	<li>hide the mouse pointer while user is typing (request by Rodolfo
+	    Borges).
+
+	<li>extend configure options
+	    <code>--enable-tcap-query</code> and
+	    <code>--enable-tcap-fkeys</code> to
+	    send cursor- and editing-keypad keys modified according to the
+	    keyboard (or termcap) selection for shift, alt, control, meta.
+
+	<li>modify <code>kdch1</code> in termcap, e.g., <code>xterm-r6</code>
+	    to match the terminfo file.
+
+	<li>add <code>-hm</code> option to turn <code>highlightColorMode</code>
+	    on or off.
+
+	<li>add <code>highlightColorMode</code> resource to separate the
+	    new (since patch #225) highlighting with both text- and
+	    background-colors (prompted by report/example by Thomas Wolff).
+
+	<li>add <em>Keep Selection</em> menu entry to turn the 
+	    <code>keepSelection</code> resource on/off at runtime.
+
+	<li>add <code>keepSelection</code> resource, which when enabled,
+	    tells xterm to retain the X selection even after it stops
+	    highlighting it (patch by Sergey Vlasov).
+
+	<li>extend the <code>CSI&nbsp;&gt;&nbsp;n</code> sequence to allow
+	    disabling all types of modified-keys that the
+	    <code>CSI&nbsp;&gt;&nbsp;m</code> sequence affects.
+
+	<li>move include for <code>&lt;xtermcap.h&gt;</code> in
+	    <code>resize.c</code> to avoid redefinition of <code>termios</code>
+	    structure on OpenSolaris (report by Rahul Gopinathan Nair).
+
+	<li>extend terminfo building blocks for modified editing keys to
+	    include all six keys.
+
+	<li>synchronize terminfo with ncurses (report by Stephane Chazelas):
+	    <ul>
+	    <li>equate <code>xterm-xfree86</code>
+	        and <code>xterm-xf86-v44</code>.
+	    <li>add ncurses extensions OTbs, AX, for termcap conversions.
+	    <li>make old/legacy entries such as
+	        <code>xterm-24</code>, <code>xterm-65</code>
+	        and aliases <code>xterms</code>, <code>vs100</code>
+		inherit from <code>xterm-old</code>.
+	    <li>make <code>xterm-r5</code> and <code>xterm-r6</code> the
+	        same, ignoring historical errors in X Consortium's version.
+	    </ul>
+
+	<li>fix an ifdef in logic for selecting regular
+	    expressions while in a narrow-character locale (Debian #449227).
+</ul>
+
+<H1><A NAME="xterm_229">Patch #229 - 2007/8/12</A></H1>
 <ul>
 	<li>override locale in minstall.sh;
 	    change in <a href="#xterm_226">patch #226</a>

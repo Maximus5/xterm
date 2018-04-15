@@ -1,9 +1,6 @@
 .\"#! troff -ms $1		-*- Nroff -*-
 .\" "Xterm Control Sequences" document
-.\" $XTermId: ctlseqs.ms,v 1.180 2007/03/15 23:47:09 tom Exp $
-.\"
-.\"
-.\" $XFree86: xc/doc/specs/xterm/ctlseqs.ms,v 3.60 2006/03/13 01:27:53 dickey Exp $
+.\" $XTermId: ctlseqs.ms,v 1.184 2007/12/12 23:39:18 tom Exp $
 .\"
 .\"
 .\" Copyright 1996-2006,2007 by Thomas E. Dickey
@@ -788,6 +785,7 @@ and use Alternate Screen Buffer, clearing it first (unless
 disabled by the \fBtiteInhibit\fP resource).
 This combines the effects of the \*1\*0\*4\*7 and \*1\*0\*4\*8 modes.
 Use this with terminfo-based applications rather than the \*4\*7 mode.
+  \*(Ps = \*1\*0\*5\*0 \(-> Set terminfo/termcap function-key mode.
   \*(Ps = \*1\*0\*5\*1 \(-> Set Sun function-key mode.
   \*(Ps = \*1\*0\*5\*2 \(-> Set HP function-key mode.
   \*(Ps = \*1\*0\*5\*3 \(-> Set SCO function-key mode.
@@ -869,6 +867,7 @@ as in DECRC (unless
 disabled by the \fBtiteInhibit\fP resource).
 This combines the effects of the \*1\*0\*4\*7 and \*1\*0\*4\*8 modes.
 Use this with terminfo-based applications rather than the \*4\*7 mode.
+  \*(Ps = \*1\*0\*5\*0 \(-> Reset terminfo/termcap function-key mode.
   \*(Ps = \*1\*0\*5\*1 \(-> Reset Sun function-key mode.
   \*(Ps = \*1\*0\*5\*2 \(-> Reset HP function-key mode.
   \*(Ps = \*1\*0\*5\*3 \(-> Reset SCO function-key mode.
@@ -958,10 +957,20 @@ Device Status Report (DSR)
 .br
 \*(Cs\*(Ir\*s\*;\*(Ic\*s\*R
 .
-.IP \\*(Cs\\*>\\*n
-Set resource-value \fBmodifyFunctionKeys\fP used by \fIxterm\fP to
-allow user to construct extended-numbering function keys using
-shift- and control-modifiers.
+.IP \\*(Cs\\*(Ps\\*>\\*n
+Disable modifiers which may be enabled via the
+\*(Cs\*>\*(Ps\*;\*(Ps\*s\*m
+sequence.
+This corresponds to a resource value of "-1", which cannot be set with
+the other sequence.
+The parameter identifies the resource to be disabled:
+  \(-> \*1 modifyCursorKeys
+  \(-> \*2 modifyFunctionKeys
+  \(-> \*4 modifyOtherKeys
+If the parameter is omitted, \fBmodifyFunctionKeys\fP is disabled.
+When \fBmodifyFunctionKeys\fP is disabled, \fIxterm\fP uses the
+modifier keys to make an extended sequence of functions rather
+than adding a parameter to each function key to denote the modifiers.
 .
 .IP \\*(Cs\\*?\\*(Ps\\*s\\*n
 Device Status Report (DSR, DEC-specific)
