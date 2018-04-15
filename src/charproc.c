@@ -1,4 +1,4 @@
-/* $XTermId: charproc.c,v 1.1422 2016/09/23 20:13:11 tom Exp $ */
+/* $XTermId: charproc.c,v 1.1426 2016/10/07 21:14:54 tom Exp $ */
 
 /*
  * Copyright 1999-2015,2016 by Thomas E. Dickey
@@ -2110,10 +2110,13 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 	 * provided that they are not intermixed with an escape sequence.
 	 */
 	if (screen->c1_printable
-	    && (c >= 128 && c < 160)) {
+	    && (c >= 128 && c < 256)) {
 	    sp->nextstate = (sp->parsestate == esc_table
 			     ? CASE_ESC_IGNORE
 			     : sp->parsestate[E2A(160)]);
+	    TRACE(("allowC1Printable %04X %s ->%s\n",
+		   c, which_table(sp->parsestate),
+		   visibleVTparse(sp->nextstate)));
 	}
 #endif
 
@@ -2216,8 +2219,8 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 	}
 
 	DumpParams();
-	TRACE(("parse %04X -> %d %s (used=%lu)\n",
-	       c, sp->nextstate,
+	TRACE(("parse %04X -> %s %s (used=%lu)\n",
+	       c, visibleVTparse(sp->nextstate),
 	       which_table(sp->parsestate),
 	       (unsigned long) sp->string_used));
 
@@ -4992,6 +4995,10 @@ dotext(XtermWidget xw,
 		if (!screen->utf8_mode
 		    || (screen->vt100_graphics && charset == '0')) {
 		    last_chomp = 1;
+		} else if (screen->c1_printable &&
+			   buf[chars_chomped + offset] >= 0x80 &&
+			   buf[chars_chomped + offset] <= 0xa0) {
+		    last_chomp = 1;
 		} else {
 		    last_chomp = my_wcwidth((wchar_t) buf[chars_chomped + offset]);
 		}
@@ -7554,7 +7561,7 @@ set_flags_from_list(char *target,
 	    char *temp;
 
 	    value = (int) strtol(next, &temp, 0);
-	    if (!IsEmpty(temp)) {
+	    if (!FullS2L(next, temp)) {
 		xtermWarning("Expected a number: %s\n", next);
 	    } else {
 		for (n = 0; n < limit; ++n) {
