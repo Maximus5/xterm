@@ -1,4 +1,4 @@
-/* $XTermId: charproc.c,v 1.1315 2013/09/10 17:27:51 tom Exp $ */
+/* $XTermId: charproc.c,v 1.1319 2013/11/26 20:38:11 tom Exp $ */
 
 /*
  * Copyright 1999-2012,2013 by Thomas E. Dickey
@@ -557,7 +557,7 @@ static XtResource xterm_resources[] =
     Bres(XtNforceBoxChars, XtCForceBoxChars, screen.force_box_chars, False),
     Bres(XtNforcePackedFont, XtCForcePackedFont, screen.force_packed, True),
     Bres(XtNshowMissingGlyphs, XtCShowMissingGlyphs, screen.force_all_chars, False),
-    Bres(XtNassumeAllChars, XtCAssumeAllChars, screen.assume_all_chars, False),
+    Bres(XtNassumeAllChars, XtCAssumeAllChars, screen.assume_all_chars, True),
 #endif
 
 #if OPT_BROKEN_OSC
@@ -1100,7 +1100,7 @@ modified_DECNRCM(XtermWidget xw)
 	int modefix;
 	EXCHANGE(screen->utf8_nrc_mode, screen->utf8_mode, modefix);
 	switchPtyData(screen, !enabled);
-	TRACE(("UTF8 mode temporarily %s\n", BtoS(!enabled)));
+	TRACE(("UTF8 mode temporarily %s\n", enabled ? "ON" : "OFF"));
     }
 #endif
 }
@@ -1469,7 +1469,7 @@ decode_scs(XtermWidget xw, int which, int prefix, int suffix)
     }
     if (result != nrc_Unknown) {
 	screen->gsets[which] = result;
-	TRACE(("setting G%d to %s\n", which, visibleScsCode(result)));
+	TRACE(("setting G%d to %s\n", which, visibleScsCode((int) result)));
     } else {
 	TRACE(("...unknown GSET\n"));
     }

@@ -1,4 +1,4 @@
-/* $XTermId: trace.c,v 1.149 2013/09/09 00:15:00 tom Exp $ */
+/* $XTermId: trace.c,v 1.153 2013/11/26 22:41:44 tom Exp $ */
 
 /*
  * Copyright 1997-2012,2013 by Thomas E. Dickey
@@ -104,6 +104,19 @@ Trace(const char *fmt,...)
 	sprintf(name, "Trace-%s.out", trace_who);
 #endif
 	trace_fp = fopen(name, "w");
+	/*
+	 * Try to put the trace-file in user's home-directory if the current
+	 * directory is not writable.
+	 */
+	if (trace_fp == 0) {
+	    char *home = getenv("HOME");
+	    if (home != 0) {
+		sprintf(name, "%.*s/Trace-%.8s.out",
+			(BUFSIZ - 21), home,
+			trace_who);
+		trace_fp = fopen(name, "w");
+	    }
+	}
 	if (trace_fp != 0) {
 	    fprintf(trace_fp, "%s\n", xtermVersion());
 	    TraceIds(NULL, 0);
@@ -215,7 +228,7 @@ visibleDblChrset(unsigned chrset)
 #endif
 
 const char *
-visibleScsCode(unsigned chrset)
+visibleScsCode(int chrset)
 {
 #define MAP(to,from) case from: result = to; break
     const char *result = "<ERR>";
@@ -903,6 +916,9 @@ TraceXtermResources(void)
     XRES_B(wait_for_map);
     XRES_B(ptyHandshake);
     XRES_B(ptySttySize);
+#endif
+#if OPT_REPORT_FONTS
+    XRES_B(reportFonts);
 #endif
 #if OPT_SAME_NAME
     XRES_B(sameName);

@@ -1,6 +1,6 @@
 .\"#! troff -ms $1		-*- Nroff -*-
 .\" "Xterm Control Sequences" document
-.\" $XTermId: ctlseqs.ms,v 1.299 2013/08/22 09:21:50 tom Exp $
+.\" $XTermId: ctlseqs.ms,v 1.303 2013/11/11 00:23:36 tom Exp $
 .\"
 .\"
 .\" Copyright 1996-2012,2013 by Thomas E. Dickey
@@ -69,8 +69,8 @@
 .\"
 .ds XT XTerm
 .ds xt xterm
-.ds LF Patch #297
-.ds RF 2013/08/22
+.ds LF Patch #298
+.ds RF 2013/11/10
 .\"
 .if n .pl 9999v		\" no page breaks in nroff
 .ND
@@ -410,8 +410,8 @@ Where the function is specified by DEC or ISO 6429, the code assigned
 to it is given in parentheses.
 .LP
 The escape codes to designate and invoke
-character sets are specified by ISO 2022; see that document for a
-discussion of character sets.
+character sets are specified by ISO 2022 (see that document for a
+discussion of character sets).
 .LP
 Many of the features are optional;
 \fI\*(xt\fP can be configured and built without support for them.
@@ -864,7 +864,7 @@ and set VT100 mode.
   \*(Ps = \*7 \(-> Wraparound Mode (DECAWM).
   \*(Ps = \*8 \(-> Auto-repeat Keys (DECARM).
   \*(Ps = \*9 \(-> Send Mouse X & Y on button press.
-See the section \fBMouse Tracking\fP.
+See the section \fBMouse Tracking\fP.  This is the X10 xterm mouse protocol.
   \*(Ps = \*1\*0 \(-> Show toolbar (rxvt).
   \*(Ps = \*1\*2 \(-> Start Blinking Cursor (att610).
   \*(Ps = \*1\*8 \(-> Print form feed (DECPFF).
@@ -887,7 +887,7 @@ disabled by the \fBtiteInhibit\fP resource).
   \*(Ps = \*6\*9 \(-> Enable left and right margin mode (DECLRMM), VT420 and up.
   \*(Ps = \*9\*5 \(-> Do not clear screen when DECCOLM is set/reset (DECNCSM), VT510 and up.
   \*(Ps = \*1\*0\*0\*0 \(-> Send Mouse X & Y on button press and release.
-See the section \fBMouse Tracking\fP.
+See the section \fBMouse Tracking\fP.  This is the X11 xterm mouse protocol.
   \*(Ps = \*1\*0\*0\*1 \(-> Use Hilite Mouse Tracking.
   \*(Ps = \*1\*0\*0\*2 \(-> Use Cell Motion Mouse Tracking.
   \*(Ps = \*1\*0\*0\*3 \(-> Use All Motion Mouse Tracking.
@@ -896,8 +896,8 @@ See the section \fBMouse Tracking\fP.
   \*(Ps = \*1\*0\*0\*6 \(-> Enable SGR Mouse Mode.
   \*(Ps = \*1\*0\*0\*7 \(-> Enable Alternate Scroll Mode.
   \*(Ps = \*1\*0\*1\*0 \(-> Scroll to bottom on tty output (rxvt).
-  \*(Ps = \*1\*0\*1\*5 \(-> Enable urxvt Mouse Mode.
   \*(Ps = \*1\*0\*1\*1 \(-> Scroll to bottom on key press (rxvt).
+  \*(Ps = \*1\*0\*1\*5 \(-> Enable urxvt Mouse Mode.
   \*(Ps = \*1\*0\*3\*4 \(-> Interpret "meta" key, sets eighth bit.
 (enables the \fBeightBitInput\fP resource).
   \*(Ps = \*1\*0\*3\*5 \(-> Enable special modifiers for Alt and NumLock keys.
@@ -994,8 +994,8 @@ See the section \fBMouse Tracking\fP.
   \*(Ps = \*1\*0\*0\*6 \(-> Disable SGR Mouse Mode.
   \*(Ps = \*1\*0\*0\*7 \(-> Disable Alternate Scroll Mode.
   \*(Ps = \*1\*0\*1\*0 \(-> Don't scroll to bottom on tty output (rxvt).
-  \*(Ps = \*1\*0\*1\*5 \(-> Disable urxvt Mouse Mode.
   \*(Ps = \*1\*0\*1\*1 \(-> Don't scroll to bottom on key press (rxvt).
+  \*(Ps = \*1\*0\*1\*5 \(-> Disable urxvt Mouse Mode.
   \*(Ps = \*1\*0\*3\*4 \(-> Don't interpret "meta" key.
 (This disables the \fBeightBitInput\fP resource).
   \*(Ps = \*1\*0\*3\*5 \(-> Disable special modifiers for Alt and NumLock keys.
@@ -2404,7 +2404,7 @@ additional codes:
 \fI\*(xt\fP has these additional private Set Mode values:
   \*(Ps = \*8\*0 \(-> SIXEL scrolling.
   \*(Ps = \*1\*0\*7\*0 \(-> use private color registers for each graphic.
-.IP \\*(Dc\\*(Pa\\*;\\*(Pb\\*;\\*(Ph\\*s\\*q\\*s\\*(Ps..\\*(Ps\fP\\*(ST
+.IP \\*(Dc\\*(Pa\\*;\\*(Pb\\*;\\*(Ph\\*s\\*q\\*s\\*(Ps..\\*(Ps\fP\\*s\\*(ST
 See
 .ID
 http://vt100.net/docs/vt3xx-gp/chapter14.html
