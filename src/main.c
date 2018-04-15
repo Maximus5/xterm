@@ -1,4 +1,4 @@
-/* $XTermId: main.c,v 1.719 2013/04/17 08:55:20 tom Exp $ */
+/* $XTermId: main.c,v 1.727 2013/05/27 22:11:11 tom Exp $ */
 
 /*
  * Copyright 2002-2012,2013 by Thomas E. Dickey
@@ -2432,21 +2432,19 @@ main(int argc, char *argv[]ENVP_ARG)
 	    x_appendargv(command_to_exec_with_luit, command_to_exec);
 	}
 	TRACE_ARGV("luit command", command_to_exec_with_luit);
+	xtermSetenv("XTERM_FILTER", *command_to_exec_with_luit);
     }
 #endif
 
-#ifdef DEBUG
-    {
+    if_DEBUG({
 	/* Set up stderr properly.  Opening this log file cannot be
 	   done securely by a privileged xterm process (although we try),
 	   so the debug feature is disabled by default. */
 	char dbglogfile[TIMESTAMP_LEN + 20];
 	int i = -1;
-	if (debug) {
-	    timestamp_filename(dbglogfile, "xterm.debug.log.");
-	    if (creat_as(save_ruid, save_rgid, False, dbglogfile, 0600) > 0) {
-		i = open(dbglogfile, O_WRONLY | O_TRUNC);
-	    }
+	timestamp_filename(dbglogfile, "xterm.debug.log.");
+	if (creat_as(save_ruid, save_rgid, False, dbglogfile, 0600) > 0) {
+	    i = open(dbglogfile, O_WRONLY | O_TRUNC);
 	}
 	if (i >= 0) {
 	    dup2(i, 2);
@@ -2454,8 +2452,7 @@ main(int argc, char *argv[]ENVP_ARG)
 	    /* mark this file as close on exec */
 	    (void) fcntl(i, F_SETFD, 1);
 	}
-    }
-#endif /* DEBUG */
+    });
 
     spawnXTerm(term);
 
@@ -2534,10 +2531,9 @@ main(int argc, char *argv[]ENVP_ARG)
 		 : (1 + screen->respond));
 
 #endif /* !VMS */
-#ifdef DEBUG
-    if (debug)
-	printf("debugging on\n");
-#endif /* DEBUG */
+    if_DEBUG({
+	TRACE(("debugging on pid %d\n", (int) getpid()));
+    });
     XSetErrorHandler(xerror);
     XSetIOErrorHandler(xioerror);
     IceSetIOErrorHandler(ice_error);
@@ -2895,6 +2891,7 @@ static const char *vtterm[] =
 static void
 hungtty(int i GCC_UNUSED)
 {
+    DEBUG_MSG("handle:hungtty\n");
     siglongjmp(env, 1);
 }
 
@@ -3192,7 +3189,7 @@ spawnXTerm(XtermWidget xw)
 #endif /* TERMIO_STRUCT */
 
     char *shell_path = 0;
-    char *ptr, *shname, *shname_minus;
+    char *shname, *shname_minus;
     int i;
 #if USE_NO_DEV_TTY
     int no_dev_tty = False;
@@ -3658,6 +3655,8 @@ spawnXTerm(XtermWidget xw)
 
 #if OPT_PTY_HANDSHAKE		/* warning, goes for a long ways */
 	    if (resource.ptyHandshake) {
+		char *ptr;
+
 		/* close parent's sides of the pipes */
 		close(cp_pipe[0]);
 		close(pc_pipe[1]);
@@ -4251,7 +4250,7 @@ spawnXTerm(XtermWidget xw)
 #else
 	    if (xw->misc.login_shell &&
 		(i = open(etc_wtmp, O_WRONLY | O_APPEND)) >= 0) {
-		write(i, (char *) &utmp, sizeof(utmp));
+		IGNORE_RC(write(i, (char *) &utmp, sizeof(utmp)));
 		close(i);
 	    }
 #endif
@@ -4283,7 +4282,7 @@ spawnXTerm(XtermWidget xw)
 
 		    utmp.ut_time = time((time_t *) 0);
 		    lseek(i, (long) (tslot * sizeof(utmp)), 0);
-		    write(i, (char *) &utmp, sizeof(utmp));
+		    IGNORE_RC(write(i, (char *) &utmp, sizeof(utmp)));
 		    close(i);
 		    added_utmp_entry = True;
 #if defined(WTMP)
@@ -4298,7 +4297,7 @@ spawnXTerm(XtermWidget xw)
 			(i = open(_U_LASTLOG, O_WRONLY)) >= 0) {
 			lseek(i, (long) (screen->uid *
 					 sizeof(utmp)), 0);
-			write(i, (char *) &utmp, sizeof(utmp));
+			IGNORE_RC(write(i, (char *) &utmp, sizeof(utmp)));
 			close(i);
 		    }
 #endif /* WTMP or MNX_LASTLOG */
@@ -4341,7 +4340,7 @@ spawnXTerm(XtermWidget xw)
 		SetUtmpHost(lastlog.ll_host, screen);
 		lastlog.ll_time = time((time_t *) 0);
 		if (lseek(i, offset, 0) != (off_t) (-1)) {
-		    write(i, (char *) &lastlog, size);
+		    IGNORE_RC(write(i, (char *) &lastlog, size));
 		}
 		close(i);
 	    }
@@ -4759,6 +4758,7 @@ Exit(int n)
     TScreen *screen = TScreenOf(xw);
 
 #ifdef USE_UTEMPTER
+    DEBUG_MSG("handle:Exit USE_UTEMPTER\n");
     if (!resource.utmpInhibit && added_utmp_entry) {
 	TRACE(("...calling removeFromUtmp\n"));
 	removeFromUtmp();
@@ -4768,6 +4768,7 @@ Exit(int n)
     struct UTMP_STR utmp;
     struct UTMP_STR *utptr;
 
+    DEBUG_MSG("handle:Exit USE_SYSV_UTMP\n");
     /* don't do this more than once */
     if (xterm_exiting) {
 	exit(n);
@@ -4821,7 +4822,7 @@ Exit(int n)
 		if (xw->misc.login_shell) {
 		    int fd;
 		    if ((fd = open(etc_wtmp, O_WRONLY | O_APPEND)) >= 0) {
-			write(fd, utptr, sizeof(*utptr));
+			IGNORE_RC(write(fd, utptr, sizeof(*utptr)));
 			close(fd);
 		    }
 		}
@@ -4841,6 +4842,7 @@ Exit(int n)
     int wfd;
     struct utmp utmp;
 
+    DEBUG_MSG("handle:Exit !USE_SYSV_UTMP\n");
     if (!resource.utmpInhibit && added_utmp_entry &&
 	(am_slave < 0 && tslot > 0)) {
 #if defined(USE_UTMP_SETGID)
@@ -4850,7 +4852,7 @@ Exit(int n)
 	if ((wfd = open(etc_utmp, O_WRONLY)) >= 0) {
 	    memset(&utmp, 0, sizeof(utmp));
 	    lseek(wfd, (long) (tslot * sizeof(utmp)), 0);
-	    write(wfd, (char *) &utmp, sizeof(utmp));
+	    IGNORE_RC(write(wfd, (char *) &utmp, sizeof(utmp)));
 	    close(wfd);
 	}
 #ifdef WTMP
@@ -4860,7 +4862,7 @@ Exit(int n)
 			   my_pty_name(ttydev),
 			   sizeof(utmp.ut_line));
 	    utmp.ut_time = time((time_t *) 0);
-	    write(wfd, (char *) &utmp, sizeof(utmp));
+	    IGNORE_RC(write(wfd, (char *) &utmp, sizeof(utmp)));
 	    close(wfd);
 	}
 #endif /* WTMP */
@@ -5024,6 +5026,8 @@ reapchild(int n GCC_UNUSED)
     int olderrno = errno;
     int pid;
 
+    DEBUG_MSG("handle:reapchild\n");
+
     pid = wait(NULL);
 
 #ifdef USE_SYSV_SIGNALS
@@ -5035,10 +5039,7 @@ reapchild(int n GCC_UNUSED)
 
     do {
 	if (pid == TScreenOf(term)->pid) {
-#ifdef DEBUG
-	    if (debug)
-		fputs("Exiting\n", stderr);
-#endif
+	    DEBUG_MSG("Exiting\n");
 	    if (!hold_screen)
 		need_cleanup = True;
 	}

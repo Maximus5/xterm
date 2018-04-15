@@ -1,4 +1,4 @@
-/* $XTermId: ptyx.h,v 1.764 2013/04/24 08:57:46 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.767 2013/05/27 22:21:32 tom Exp $ */
 
 /*
  * Copyright 1999-2012,2013 by Thomas E. Dickey
@@ -2832,6 +2832,18 @@ typedef struct Tek_Link
 #ifndef TRACE2
 #define TRACE2(p) /*nothing*/
 #endif
+
+#if OPT_TRACE && !defined(DEBUG)
+#define DEBUG 1
+#endif
+
+#ifdef DEBUG
+#define if_DEBUG(code) if(debug) code
+#else
+#define if_DEBUG(code) /*nothing*/
+#endif
+
+#define DEBUG_MSG(text) if_DEBUG({ IGNORE_RC(write(2, text, sizeof(text) - 1)); })
 
 /* *INDENT-ON* */
 
