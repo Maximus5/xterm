@@ -1,8 +1,8 @@
-dnl $XTermId: aclocal.m4,v 1.321 2012/01/12 13:09:35 tom Exp $
+dnl $XTermId: aclocal.m4,v 1.323 2012/05/07 23:58:20 tom Exp $
 dnl
 dnl ---------------------------------------------------------------------------
 dnl
-dnl Copyright 1997-2010,2011 by Thomas E. Dickey
+dnl Copyright 1997-2011,2012 by Thomas E. Dickey
 dnl
 dnl                         All Rights Reserved
 dnl
@@ -543,11 +543,15 @@ AC_DEFUN([CF_ERRNO],
 CF_CHECK_ERRNO(errno)
 ])dnl
 dnl ---------------------------------------------------------------------------
-dnl CF_FUNC_GRANTPT version: 3 updated: 2012/01/12 08:07:51
+dnl CF_FUNC_GRANTPT version: 7 updated: 2012/05/07 19:39:45
 dnl ---------------
 dnl Check for grantpt versus openpty, as well as functions that "should" be
 dnl available if grantpt is available.
 AC_DEFUN([CF_FUNC_GRANTPT],[
+
+AC_CHECK_HEADERS( \ 
+stropts.h \
+) 
 
 cf_func_grantpt="grantpt ptsname"
 case $host_os in #(vi
@@ -560,9 +564,103 @@ esac
 
 AC_CHECK_FUNCS($cf_func_grantpt)
 
-if test "x$ac_cv_func_grantpt" != "xyes" ; then
+cf_grantpt_opts=
+if test "x$ac_cv_func_grantpt" = "xyes" ; then
+	AC_MSG_CHECKING(if grantpt really works)
+	AC_TRY_LINK(CF__GRANTPT_HEAD,CF__GRANTPT_BODY,[
+	AC_TRY_RUN(CF__GRANTPT_HEAD
+int main(void)
+{
+CF__GRANTPT_BODY
+}
+,
+,ac_cv_func_grantpt=no
+,ac_cv_func_grantpt=maybe)
+	],ac_cv_func_grantpt=no)
+	AC_MSG_RESULT($ac_cv_func_grantpt)
+
+	if test "x$ac_cv_func_grantpt" != "xno" ; then
+
+		if test "x$ac_cv_func_grantpt" = "xyes" ; then
+			AC_MSG_CHECKING(for pty features)
+dnl if we have no stropts.h, skip the checks for streams modules
+			if test "x$ac_cv_header_stropts_h" = xyes
+			then
+				cf_pty_this=0
+			else
+				cf_pty_this=3
+			fi
+
+			cf_pty_defines=
+			while test $cf_pty_this != 6
+			do
+
+				cf_pty_feature=
+				cf_pty_next=`expr $cf_pty_this + 1`
+				CF_MSG_LOG(pty feature test $cf_pty_next:5)
+				AC_TRY_RUN(#define CONFTEST $cf_pty_this
+$cf_pty_defines
+CF__GRANTPT_HEAD
+int main(void)
+{
+CF__GRANTPT_BODY
+}
+,
+[
+				case $cf_pty_next in #(vi
+				1) #(vi - streams
+					cf_pty_feature=ptem
+					;;
+				2) #(vi - streams
+					cf_pty_feature=ldterm
+					;;
+				3) #(vi - streams
+					cf_pty_feature=ttcompat
+					;;
+				4) #(vi
+					cf_pty_feature=pty_isatty
+					;;
+				5) #(vi
+					cf_pty_feature=pty_tcsetattr
+					;;
+				6) #(vi
+					cf_pty_feature=tty_tcsetattr
+					;;
+				esac
+],[
+				case $cf_pty_next in #(vi
+				1|2|3)
+					CF_MSG_LOG(skipping remaining streams features $cf_pty_this..2)
+					cf_pty_next=3
+					;;
+				esac
+])
+				if test -n "$cf_pty_feature"
+				then
+					cf_pty_defines="$cf_pty_defines
+#define CONFTEST_$cf_pty_feature 1
+"
+					cf_grantpt_opts="$cf_grantpt_opts $cf_pty_feature"
+				fi
+
+				cf_pty_this=$cf_pty_next
+			done
+			AC_MSG_RESULT($cf_grantpt_opts)
+			cf_grantpt_opts=`echo "$cf_grantpt_opts" | sed -e 's/ isatty//'`
+		fi
+	fi
+fi
+
+dnl If we found grantpt, but no features, e.g., for streams or if we are not
+dnl able to use tcsetattr, then give openpty a try.  In particular, Darwin 10.7
+dnl has a more functional openpty than posix_openpt.
+dnl
+dnl There is no configure run-test for openpty, since its implementations do
+dnl not always run properly as a non-root user.
+if test "x$ac_cv_func_grantpt" != "xyes" || test -z "$cf_grantpt_opts" ; then
 	AC_CHECK_LIB(util, openpty, [cf_have_openpty=yes],[cf_have_openpty=no])
 	if test "$cf_have_openpty" = yes ; then
+		ac_cv_func_grantpt=no
 		LIBS="-lutil $LIBS"
 		AC_DEFINE(HAVE_OPENPTY)
 		AC_CHECK_HEADERS( \ 
@@ -571,6 +669,21 @@ if test "x$ac_cv_func_grantpt" != "xyes" ; then
 			pty.h \
 		)
 	fi
+fi
+
+dnl If we did not settle on using openpty, fill in the definitions for grantpt.
+if test "x$ac_cv_func_grantpt" != xno
+then
+	AC_DEFINE(HAVE_WORKING_GRANTPT)
+	for cf_feature in $cf_grantpt_opts
+	do
+		cf_feature=`echo "$cf_feature" | sed -e 's/ //g'`
+		CF_UPPER(cf_FEATURE,$cf_feature)
+		AC_DEFINE_UNQUOTED(HAVE_GRANTPT_$cf_FEATURE)
+	done
+elif test "x$cf_have_openpty" = xno
+then
+	CF_VERBOSE(will rely upon BSD-pseudoterminals)
 fi
 ])dnl
 dnl ---------------------------------------------------------------------------
@@ -854,7 +967,7 @@ if test "$GCC" = yes ; then
 fi
 ])dnl
 dnl ---------------------------------------------------------------------------
-dnl CF_GCC_WARNINGS version: 27 updated: 2010/10/23 15:52:32
+dnl CF_GCC_WARNINGS version: 28 updated: 2012/03/31 20:10:46
 dnl ---------------
 dnl Check if the compiler supports useful warning options.  There's a few that
 dnl we don't use, simply because they're too noisy:
@@ -948,6 +1061,13 @@ then
 			Winline) #(vi
 				case $GCC_VERSION in
 				[[34]].*)
+					CF_VERBOSE(feature is broken in gcc $GCC_VERSION)
+					continue;;
+				esac
+				;;
+			Wpointer-arith) #(vi
+				case $GCC_VERSION in
+				[[12]].*)
 					CF_VERBOSE(feature is broken in gcc $GCC_VERSION)
 					continue;;
 				esac
@@ -1726,7 +1846,7 @@ AC_SUBST(PROG_EXT)
 test -n "$PROG_EXT" && AC_DEFINE_UNQUOTED(PROG_EXT,"$PROG_EXT")
 ])dnl
 dnl ---------------------------------------------------------------------------
-dnl CF_REGEX version: 8 updated: 2010/08/07 14:09:44
+dnl CF_REGEX version: 9 updated: 2012/01/07 15:08:24
 dnl --------
 dnl Attempt to determine if we've got one of the flavors of regular-expression
 dnl code that we can support.
@@ -1738,7 +1858,7 @@ cf_regex_func=no
 cf_regex_libs="regex re"
 case $host_os in #(vi
 mingw*)
-	cf_regex_libs="regex.dll $cf_regex_libs"
+	cf_regex_libs="gnurx $cf_regex_libs"
 	;;
 esac
 
@@ -3712,3 +3832,99 @@ test program.  You will have to check and add the proper libraries by hand
 to makefile.])
 fi
 ])dnl
+dnl ---------------------------------------------------------------------------
+dnl CF__GRANTPT_BODY version: 4 updated: 2012/05/07 19:39:45
+dnl ----------------
+dnl Body for workability check of grantpt.
+define([CF__GRANTPT_BODY],[
+	int code = 0;
+	int rc;
+	int pty;
+	int tty;
+	char *slave;
+	struct termios tio;
+
+	signal(SIGALRM, my_timeout);
+
+	if (alarm(2) == 9)
+		failed(9);
+	else if ((pty = posix_openpt(O_RDWR)) < 0)
+		failed(1);
+	else if ((rc = grantpt(pty)) < 0)
+		failed(2);
+	else if ((rc = unlockpt(pty)) < 0)
+		failed(3);
+	else if ((slave = ptsname(pty)) == 0)
+		failed(4);
+#if (CONFTEST == 3) || defined(CONFTEST_isatty)
+	else if (!isatty(pty))
+		failed(4);
+#endif
+#if CONFTEST >= 4
+    else if ((rc = tcgetattr(pty, &tio)) < 0)
+		failed(20);
+    else if ((rc = tcsetattr(pty, TCSAFLUSH, &tio)) < 0)
+		failed(21);
+#endif
+	/* BSD posix_openpt does not treat pty as a terminal until slave is opened.
+	 * Linux does treat it that way.
+	 */
+	else if ((tty = open(slave, O_RDWR)) < 0)
+		failed(5);
+#ifdef CONFTEST
+#ifdef I_PUSH
+#if (CONFTEST == 0) || defined(CONFTEST_ptem)
+    else if ((rc = ioctl(tty, I_PUSH, "ptem")) < 0)
+		failed(10);
+#endif
+#if (CONFTEST == 1) || defined(CONFTEST_ldterm)
+    else if ((rc = ioctl(tty, I_PUSH, "ldterm")) < 0)
+		failed(11);
+#endif
+#if (CONFTEST == 2) || defined(CONFTEST_ttcompat)
+    else if ((rc = ioctl(tty, I_PUSH, "ttcompat")) < 0)
+		failed(12);
+#endif
+#endif /* I_PUSH */
+#if CONFTEST >= 5
+    else if ((rc = tcgetattr(tty, &tio)) < 0)
+		failed(30);
+    else if ((rc = tcsetattr(tty, TCSAFLUSH, &tio)) < 0)
+		failed(31);
+#endif
+#endif /* CONFTEST */
+
+	${cf_cv_main_return:-return}(code);
+])
+dnl ---------------------------------------------------------------------------
+dnl CF__GRANTPT_HEAD version: 3 updated: 2012/01/29 17:13:14
+dnl ----------------
+dnl Headers for workability check of grantpt.
+define([CF__GRANTPT_HEAD],[
+#include <stdlib.h>
+#include <termios.h>
+#include <unistd.h>
+#include <signal.h>
+#include <fcntl.h>
+#include <errno.h>
+
+#ifndef HAVE_POSIX_OPENPT
+#undef posix_openpt
+#define posix_openpt(mode) open("/dev/ptmx", mode)
+#endif
+
+#ifdef HAVE_STROPTS_H
+#include <stropts.h>
+#endif
+
+static void failed(int code)
+{
+	perror("conftest");
+	exit(code);
+}
+
+static void my_timeout(int sig)
+{
+	exit(99);
+}
+])
