@@ -1,7 +1,7 @@
-/* $XTermId: ptyx.h,v 1.789 2013/11/23 17:04:26 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.794 2014/03/02 22:38:51 tom Exp $ */
 
 /*
- * Copyright 1999-2012,2013 by Thomas E. Dickey
+ * Copyright 1999-2013,2014 by Thomas E. Dickey
  *
  *                         All Rights Reserved
  *
@@ -79,6 +79,13 @@
 #endif
 
 #include <stdio.h>
+
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#define DECONST(type,s) ((type *)(intptr_t)(const type *)(s))
+#else
+#define DECONST(type,s) ((type *)(s))
+#endif
 
 /* adapted from IntrinsicI.h */
 #define MyStackAlloc(size, stack_cache_array)     \
@@ -655,6 +662,10 @@ typedef struct {
 #else
 #define OPT_RENDERWIDE 0
 #endif
+#endif
+
+#ifndef OPT_REPORT_COLORS
+#define OPT_REPORT_COLORS  1 /* provide "-report-colors" option */
 #endif
 
 #ifndef OPT_REPORT_FONTS
@@ -1387,14 +1398,14 @@ typedef unsigned char IChar;	/* for 8-bit characters */
 
 #define Cres(name, class, offset, dftvalue) \
 	{RES_NAME(name), RES_CLASS(class), XtRPixel, sizeof(Pixel), \
-	 RES_OFFSET(offset), XtRString, (XtPointer) dftvalue}
+	 RES_OFFSET(offset), XtRString, DECONST(char,dftvalue)}
 
 #define Tres(name, class, offset, dftvalue) \
 	COLOR_RES2(name, class, screen.Tcolors[offset], dftvalue) \
 
 #define Fres(name, class, offset, dftvalue) \
 	{RES_NAME(name), RES_CLASS(class), XtRFontStruct, sizeof(XFontStruct *), \
-	 RES_OFFSET(offset), XtRString, (XtPointer) dftvalue}
+	 RES_OFFSET(offset), XtRString, DECONST(char,dftvalue)}
 
 #define Ires(name, class, offset, dftvalue) \
 	{RES_NAME(name), RES_CLASS(class), XtRInt, sizeof(int), \
@@ -1402,11 +1413,11 @@ typedef unsigned char IChar;	/* for 8-bit characters */
 
 #define Dres(name, class, offset, dftvalue) \
 	{RES_NAME(name), RES_CLASS(class), XtRFloat, sizeof(float), \
-	 RES_OFFSET(offset), XtRString, (XtPointer) dftvalue}
+	 RES_OFFSET(offset), XtRString, DECONST(char,dftvalue)}
 
 #define Sres(name, class, offset, dftvalue) \
 	{RES_NAME(name), RES_CLASS(class), XtRString, sizeof(char *), \
-	 RES_OFFSET(offset), XtRString, (XtPointer) dftvalue}
+	 RES_OFFSET(offset), XtRString, DECONST(char,dftvalue)}
 
 #define Wres(name, class, offset, dftvalue) \
 	{RES_NAME(name), RES_CLASS(class), XtRWidget, sizeof(Widget), \
@@ -1869,6 +1880,7 @@ typedef struct {
 	char *		utf8_mode_s;	/* use UTF-8 decode/encode	*/
 	char *		utf8_fonts_s;	/* use UTF-8 decode/encode	*/
 	int		utf8_nrc_mode;	/* saved UTF-8 mode for DECNRCM */
+	Boolean		utf8_always;	/* special case for wideChars	*/
 	int		utf8_mode;	/* use UTF-8 decode/encode: 0-2	*/
 	int		utf8_fonts;	/* use UTF-8 decode/encode: 0-2	*/
 	int		max_combining;	/* maximum # of combining chars	*/
@@ -2647,6 +2659,8 @@ typedef unsigned Tabs [TAB_ARRAY_SIZE];
 typedef struct _XtermWidgetRec {
     CorePart	core;
     XSizeHints	hints;
+    XVisualInfo *visInfo;
+    int		numVisuals;
     Bool	init_menu;
     TKeyboard	keyboard;	/* terminal keyboard		*/
     TScreen	screen;		/* terminal screen		*/

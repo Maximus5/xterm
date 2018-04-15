@@ -1,5 +1,5 @@
 '\" t
-.\" $XTermId: xterm.man,v 1.576 2014/01/16 01:19:19 tom Exp $
+.\" $XTermId: xterm.man,v 1.579 2014/03/02 12:06:08 tom Exp $
 .\"
 .\" Copyright 1996-2013,2014 by Thomas E. Dickey
 .\"
@@ -314,20 +314,29 @@ well with \fI\*n\fP.
 This happens with the color (\fB\-fg\fP, \fB\-B\fP) and reverse (\fB\-rv\fP)
 options.
 \fI\*N\fP makes a special case of these and
-adjusts its sense of \*(``reverse\*('' 
+adjusts its sense of \*(``reverse\*(''
 to lessen user surprise.
 .\" ***************************************************************************
 .PP
 One parameter (after all options) may be given.
-That overrides \fI\*n\fP's built-in choice of shell program.
-Normally \fI\*n\fP checks the \*(``SHELL\*('' variable.
-If that is not set, \fI\*n\fP tries to use the shell program specified
-in the password file.
-If that is not set, \fI\*n\fP uses \fI/bin/sh\fP.
+That overrides \fI\*n\fP's built-in choice of shell program:
+.bP
 If the parameter is not a relative path, i.e.,
 beginning with \*(``./\*('' or \*(``../\*('',
 \fI\*n\fP looks for the file in the user's PATH.
-In either case, it constructs an absolute path.
+In either case, this check fails
+if \fI\*n\fP cannot construct an absolute path.
+.bP
+If that check fails,
+\fI\*n\fP next checks the \*(``SHELL\*('' variable.
+.bP
+If \*(``SHELL\*('' is not set,
+\fI\*n\fP tries to use the shell program specified
+in the user's password file entry.
+.bP
+Finally, if the password file entry does not specify a shell,
+\fI\*n\fP uses \fI/bin/sh\fP.
+.PP
 The \fB\-e\fP option cannot be used with this parameter since
 it uses all parameters following the option.
 .\" ***************************************************************************
@@ -869,6 +878,11 @@ Control-G is received.
 This option indicates that the window should not be raised whenever a
 Control-G is received.
 .TP 8
+.B \-report\-colors
+Print a report to the standard output showing information about colors
+as \fI\*n\fP allocates them.
+This corresponds to the \fBreportColors\fP resource.
+.TP 8
 .B \-report\-fonts
 Print a report to the standard output showing information about fonts
 which are loaded.
@@ -1059,7 +1073,9 @@ This option sets the \fButf8\fP resource.
 When \fButf8\fP is set, \fI\*n\fP interprets incoming data as UTF-8.
 This sets the \fBwideChars\fP resource as a side-effect,
 but the UTF-8 mode set by this option prevents it from being turned off.
-If you must turn it on and off, use the \fBwideChars\fP resource.
+If you must turn UTF-8 encoding on and off,
+use the \fB\-wc\fP option or the corresponding \fBwideChars\fP resource,
+rather than the \fB\-u8\fP option.
 .IP
 This option and the \fButf8\fR resource are overridden by
 the \fB\-lc\fP and \fB\-en\fP options and \fBlocale\fR resource.
@@ -1117,10 +1133,15 @@ This option indicates that a visual bell should not be used.
 .TP 8
 .B \-wc
 This option sets the \fBwideChars\fP resource.
-When \fBwideChars\fP is set, \fI\*n\fP maintains internal structures for 16-bit
-characters.
-If you do not set this resource to \*(``true\*('',
-\fI\*n\fP will ignore the escape sequence which turns UTF-8 mode on and off.
+.IP
+When \fBwideChars\fP is set,
+\fI\*n\fP maintains internal structures for 16-bit characters.
+If \fI\*n\fP is not started in UTF-8 mode (or if this resource is not set),
+initially it maintains those structures to support 8-bit characters.
+\fI\*N\fP can later be switched,
+using a menu entry or control sequence,
+causing it to reallocate those structures to support 16-bit characters.
+.IP
 The default is \*(``false\*(''.
 .TP 8
 .B +wc
@@ -1964,7 +1985,7 @@ If \*(``true\*('', this enables a special case in bitmap fonts to
 allow the font server to choose how to display missing glyphs.
 The default is \*(``true\*(''.
 .IP
-The reason for this resource is to help with 
+The reason for this resource is to help with
 certain quasi-automatically generated fonts
 (such as the ISO-10646-1 encoding of Terminus)
 which have incorrect font-metrics.
@@ -6441,6 +6462,10 @@ when \fI\*n\fP is configured to update utmp.
 SHELL
 when \fI\*n\fP is configured to update utmp.
 It is also set if you provide the shell name as the optional parameter.
+.IP
+\fI\*N\fP sets this to an absolute pathname.
+If you have set the variable to a relative pathname,
+\fI\*n\fP may set it to a different shell pathname.
 .TP 5
 TERMCAP
 the contents of the termcap entry corresponding to $TERM,

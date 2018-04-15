@@ -1,7 +1,7 @@
-/* $XTermId: charproc.c,v 1.1319 2013/11/26 20:38:11 tom Exp $ */
+/* $XTermId: charproc.c,v 1.1322 2014/03/02 23:32:05 tom Exp $ */
 
 /*
- * Copyright 1999-2012,2013 by Thomas E. Dickey
+ * Copyright 1999-2013,2014 by Thomas E. Dickey
  *
  *                         All Rights Reserved
  *
@@ -3924,12 +3924,16 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 	     * command-line, allow it to be enabled/disabled by
 	     * control sequence.
 	     */
+	    TRACE(("CASE_UTF8 wide:%d, utf8:%d, req:%s\n",
+		   screen->wide_chars,
+		   screen->utf8_mode,
+		   BtoS(c == 'G')));
+	    if ((!screen->wide_chars) && (c == 'G')) {
+		WriteNow();
+		ChangeToWide(xw);
+	    }
 	    if (screen->wide_chars
-		&& screen->utf8_mode != uAlways) {
-		if (!screen->wide_chars) {
-		    WriteNow();
-		    ChangeToWide(xw);
-		}
+		&& !screen->utf8_always) {
 		switchPtyData(screen, c == 'G');
 		TRACE(("UTF8 mode %s\n",
 		       BtoS(screen->utf8_mode)));
@@ -6937,6 +6941,7 @@ VTInitialize_locale(XtermWidget xw)
     TRACE(("... request screen.utf8_mode = %d\n", screen->utf8_mode));
     TRACE(("... request screen.utf8_fonts = %d\n", screen->utf8_fonts));
 
+    screen->utf8_always = (screen->utf8_mode == uAlways);
     if (screen->utf8_mode < 0)
 	screen->utf8_mode = uFalse;
 
@@ -7396,6 +7401,11 @@ VTInitialize(Widget wrequest,
      * need to do anything special.
      */
     TScreenOf(wnew)->display = wnew->core.screen->display;
+
+    /* prep getVisualInfo() */
+    wnew->visInfo = 0;
+    wnew->numVisuals = 0;
+    (void) getVisualInfo(wnew);
 
     /*
      * We use the default foreground/background colors to compare/check if a
@@ -8334,14 +8344,16 @@ VTDestroy(Widget w GCC_UNUSED)
 #endif
 
     if (screen->selection_atoms)
-	XtFree((char *) (screen->selection_atoms));
+	XtFree((void *) (screen->selection_atoms));
 
-    XtFree((char *) (screen->selection_data));
+    XtFree((void *) (screen->selection_data));
 
     TRACE_FREE_LEAK(xtermClassRec.core_class.tm_table);
     TRACE_FREE_LEAK(xw->keyboard.extra_translations);
     TRACE_FREE_LEAK(xw->keyboard.shell_translations);
     TRACE_FREE_LEAK(xw->keyboard.xterm_translations);
+
+    XtFree((void *) (xw->visInfo));
 
 #if OPT_WIDE_CHARS
     FreeTypedBuffer(XChar2b);

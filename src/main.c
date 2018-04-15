@@ -1,4 +1,4 @@
-/* $XTermId: main.c,v 1.741 2014/01/16 02:12:25 tom Exp $ */
+/* $XTermId: main.c,v 1.748 2014/03/03 01:15:27 tom Exp $ */
 
 /*
  * Copyright 2002-2013,2014 by Thomas E. Dickey
@@ -871,6 +871,9 @@ static XtResource application_resources[] =
     Bres("ptyHandshake", "PtyHandshake", ptyHandshake, True),
     Bres("ptySttySize", "PtySttySize", ptySttySize, DEF_PTY_STTY_SIZE),
 #endif
+#if OPT_REPORT_COLORS
+    Bres("reportColors", "ReportColors", reportColors, False),
+#endif
 #if OPT_REPORT_FONTS
     Bres("reportFonts", "ReportFonts", reportFonts, False),
 #endif
@@ -1008,6 +1011,9 @@ static XrmOptionDescRec optionDescList[] = {
 {"+s",		"*multiScroll",	XrmoptionNoArg,		(XPointer) "off"},
 {"-sb",		"*scrollBar",	XrmoptionNoArg,		(XPointer) "on"},
 {"+sb",		"*scrollBar",	XrmoptionNoArg,		(XPointer) "off"},
+#if OPT_REPORT_COLORS
+{"-report-colors","*reportColors", XrmoptionNoArg,	(XPointer) "on"},
+#endif
 #if OPT_REPORT_FONTS
 {"-report-fonts","*reportFonts", XrmoptionNoArg,	(XPointer) "on"},
 #endif
@@ -3145,6 +3151,7 @@ find_utmp(struct UTMP_STR *tofind)
 
 /*
  * Only set $SHELL for paths found in the standard location.
+ * ...or if $SHELL happens to give an absolute pathname to an executable.
  */
 static Boolean
 validShell(const char *pathname)
@@ -3156,8 +3163,7 @@ validShell(const char *pathname)
     size_t rc;
     FILE *fp;
 
-    if (!IsEmpty(pathname)
-	&& access(pathname, X_OK) == 0
+    if (validProgram(pathname)
 	&& stat(ok_shells, &sb) == 0
 	&& (sb.st_mode & S_IFMT) == S_IFREG
 	&& (sb.st_size != 0)
@@ -3167,8 +3173,10 @@ validShell(const char *pathname)
 	    if (rc == (size_t) sb.st_size) {
 		char *p = blob;
 		char *q, *r;
+		blob[rc] = '\0';
 		while (!result && (q = strtok(p, "\n")) != 0) {
 		    if ((r = x_strtrim(q)) != 0) {
+			TRACE(("...test \"%s\"\n", q));
 			if (!strcmp(q, pathname)) {
 			    result = True;
 			}
@@ -4561,6 +4569,7 @@ spawnXTerm(XtermWidget xw)
 
 	    /*
 	     * If we have an explicit shell to run, make that set $SHELL.
+	     * Next, allow an existing setting of $SHELL, for absolute paths.
 	     * Otherwise, if $SHELL is not set, determine it from the user's
 	     * password information, if possible.
 	     *
@@ -4568,10 +4577,11 @@ spawnXTerm(XtermWidget xw)
 	     * program rather than choosing between $SHELL and "/bin/sh".
 	     */
 	    if (validShell(explicit_shname)) {
-		xtermSetenv("SHELL", explicit_shname);
-		shell_path = explicit_shname;
-	    } else if (validShell(shell_path = x_getenv("SHELL"))) {
-		;		/* OK */
+		xtermSetenv("SHELL", shell_path = explicit_shname);
+	    } else if (validProgram(shell_path = x_getenv("SHELL"))) {
+		if (!validShell(shell_path)) {
+		    xtermUnsetenv("SHELL");
+		}
 	    } else if ((!OkPasswd(&pw) && !x_getpwuid(screen->uid, &pw))
 		       || *(shell_path = x_strdup(pw.pw_shell)) == 0) {
 		shell_path = resetShell(shell_path);
@@ -4588,8 +4598,8 @@ spawnXTerm(XtermWidget xw)
 	    if (explicit_shname != 0 && access(explicit_shname, X_OK) == 0) {
 		free(shell_path);
 		shell_path = explicit_shname;
+		xtermSetenv("XTERM_SHELL", shell_path);
 	    }
-	    xtermSetenv("XTERM_SHELL", shell_path);
 
 	    shname = x_basename(shell_path);
 	    TRACE(("shell path '%s' leaf '%s'\n", shell_path, shname));
