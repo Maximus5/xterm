@@ -1,7 +1,7 @@
-# $XTermId: xterm.spec,v 1.30 2012/06/26 08:35:55 tom Exp $
+# $XTermId: xterm.spec,v 1.32 2012/08/21 00:05:57 tom Exp $
 Summary: X terminal emulator (development version)
 Name: xterm-dev
-Version: 281
+Version: 282
 Release: 1
 License: X11
 Group: User Interface/X
@@ -97,7 +97,8 @@ CPPFLAGS="-DMISC_EXP -DEXP_HTTP_HEADERS" \
 	--with-pixmapdir=%{_pixmapsdir} \
 	--with-own-terminfo=%{_datadir}/terminfo \
 	--with-terminal-type=xterm-new \
-	--with-utempter
+	--with-utempter \
+	--with-xpm
 	copy config.status /tmp/
 make
 

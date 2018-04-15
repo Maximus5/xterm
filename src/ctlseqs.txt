@@ -9,6 +9,7 @@
 
                         Xterm Control Sequences
 
+
                                Edward Moy
                    University of California, Berkeley
 
@@ -209,8 +210,8 @@ DCS + p Pt ST
           as by the Request Termcap/Terminfo String control.
 DCS + q Pt ST
           Request Termcap/Terminfo String (xterm, experimental).  The
-          string following the "q" is a list of names encoded in hex-
-          adecimal (2 digits per character) separated by ; which corre-
+          string following the "q" is a list of names encoded in hexa-
+          decimal (2 digits per character) separated by ; which corre-
           spond to termcap or terminfo key names.
           Two special features are also recognized, which are not key
           names: Co for termcap colors (or colors for terminfo colors),
@@ -380,6 +381,7 @@ CSI ? Pm h
             Ps = 1 0 0 4  -> Send FocusIn/FocusOut events.
             Ps = 1 0 0 5  -> Enable UTF-8 Mouse Mode.
             Ps = 1 0 0 6  -> Enable SGR Mouse Mode.
+            Ps = 1 0 0 7  -> Enable Alternate Scroll Mode.
             Ps = 1 0 1 0  -> Scroll to bottom on tty output (rxvt).
             Ps = 1 0 1 5  -> Enable urxvt Mouse Mode.
             Ps = 1 0 1 1  -> Scroll to bottom on key press (rxvt).
@@ -475,6 +477,7 @@ CSI ? Pm l
             Ps = 1 0 0 4  -> Don't send FocusIn/FocusOut events.
             Ps = 1 0 0 5  -> Disable UTF-8 Mouse Mode.
             Ps = 1 0 0 6  -> Disable SGR Mouse Mode.
+            Ps = 1 0 0 7  -> Disable Alternate Scroll Mode.
             Ps = 1 0 1 0  -> Don't scroll to bottom on tty output
           (rxvt).
             Ps = 1 0 1 5  -> Disable urxvt Mouse Mode.
@@ -572,9 +575,22 @@ CSI Pm m  Character Attributes (SGR).
             Ps = 1 0 0  -> Set foreground and background color to
           default.
 
-          If 88- or 256-color support is compiled, the following apply.
+          Xterm maintains a color palette whose entries are identified
+          by an index beginning with zero.  If 88- or 256-color support
+          is compiled, the following apply:
+          o   All parameters are decimal integers.
+          o   RGB values range from zero (0) to 255.
+          o   ISO-8613-3 can be interpreted in more than one way; xterm
+              allows the semicolons in this control to be replaced by
+              colons (but after the first colon, colons must be used).
+
+          These ISO-8613-3 controls are supported:
+            Ps = 3 8  ; 2  ; Pr ; Pg ; Pb -> Set foreground color to the
+          closest match in xterm's palette for the given RGB Pr/Pg/Pb.
             Ps = 3 8  ; 5  ; Ps -> Set foreground color to the second
           Ps.
+            Ps = 4 8  ; 2  ; Pr ; Pg ; Pb -> Set background color to the
+          closest match in xterm's palette for the given RGB Pr/Pg/Pb.
             Ps = 4 8  ; 5  ; Ps -> Set background color to the second
           Ps.
 
@@ -684,6 +700,8 @@ CSI Ps SP q
             Ps = 2  -> steady block.
             Ps = 3  -> blinking underline.
             Ps = 4  -> steady underline.
+            Ps = 5  -> blinking bar (xterm).
+            Ps = 6  -> steady bar (xterm).
 CSI Ps " q
           Select character protection attribute (DECSCA).  Valid values
           for the parameter:
@@ -732,8 +750,11 @@ CSI Ps ; Ps ; Ps t
             Ps = 9  ;  0  -> Restore maximized window.
             Ps = 9  ;  1  -> Maximize window (i.e., resize to screen
           size).
+            Ps = 9  ;  2  -> Maximize window vertically.
+            Ps = 9  ;  3  -> Maximize window horizontally.
             Ps = 1 0  ;  0  -> Undo full-screen mode.
             Ps = 1 0  ;  1  -> Change to full-screen.
+            Ps = 1 0  ;  2  -> Toggle full-screen.
             Ps = 1 1  -> Report xterm window state.  If the xterm window
           is open (non-iconified), it returns CSI 1 t .  If the xterm
           window is iconified, it returns CSI 2 t .
@@ -1423,6 +1444,8 @@ as follows:
                 #define SET_SGR_EXT_MODE_MOUSE      1006
                 #define SET_URXVT_EXT_MODE_MOUSE    1015
 
+                #define SET_ALTERNATE_SCROLL        1007
+
 The motion reporting modes are strictly xterm extensions, and are not
 part of any standard, though they are analogous to the DEC VT200 DECELR
 locator reports.
@@ -1461,7 +1484,12 @@ o   Cx and Cy are the x and y coordinates of the mouse event, encoded as
 Wheel mice may return buttons 4 and 5.  Those buttons are represented by
 the same event codes as buttons 1 and 2 respectively, except that 64 is
 added to the event code.  Release events for the wheel buttons are not
-reported.
+reported.  By default, the wheel mouse events are translated to scroll-
+back and scroll-forw actions.  Those actions normally scroll the whole
+window, as if the scrollbar was used.  However if Alternate Scroll mode
+is set, then cursor up/down controls are sent when the terminal is dis-
+playing the alternate screen.  The initial state of Alternate Scroll
+mode is set using the alternateScroll resource.
 
 Mouse highlight tracking notifies a program of a button press, receives
 a range of lines from the program, highlights the region covered by the

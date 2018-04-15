@@ -1,6 +1,6 @@
 .\"#! troff -ms $1		-*- Nroff -*-
 .\" "Xterm Control Sequences" document
-.\" $XTermId: ctlseqs.ms,v 1.267 2012/06/11 09:10:57 tom Exp $
+.\" $XTermId: ctlseqs.ms,v 1.274 2012/09/26 08:51:31 tom Exp $
 .\"
 .\"
 .\" Copyright 1996-2011,2012 by Thomas E. Dickey
@@ -876,6 +876,7 @@ See the section \fBMouse Tracking\fP.
   \*(Ps = \*1\*0\*0\*4 \(-> Send FocusIn/FocusOut events.
   \*(Ps = \*1\*0\*0\*5 \(-> Enable UTF-8 Mouse Mode.
   \*(Ps = \*1\*0\*0\*6 \(-> Enable SGR Mouse Mode.
+  \*(Ps = \*1\*0\*0\*7 \(-> Enable Alternate Scroll Mode.
   \*(Ps = \*1\*0\*1\*0 \(-> Scroll to bottom on tty output (rxvt).
   \*(Ps = \*1\*0\*1\*5 \(-> Enable urxvt Mouse Mode.
   \*(Ps = \*1\*0\*1\*1 \(-> Scroll to bottom on key press (rxvt).
@@ -973,6 +974,7 @@ See the section \fBMouse Tracking\fP.
   \*(Ps = \*1\*0\*0\*4 \(-> Don't send FocusIn/FocusOut events.
   \*(Ps = \*1\*0\*0\*5 \(-> Disable UTF-8 Mouse Mode.
   \*(Ps = \*1\*0\*0\*6 \(-> Disable SGR Mouse Mode.
+  \*(Ps = \*1\*0\*0\*7 \(-> Disable Alternate Scroll Mode.
   \*(Ps = \*1\*0\*1\*0 \(-> Don't scroll to bottom on tty output (rxvt).
   \*(Ps = \*1\*0\*1\*5 \(-> Disable urxvt Mouse Mode.
   \*(Ps = \*1\*0\*1\*1 \(-> Don't scroll to bottom on key press (rxvt).
@@ -1067,8 +1069,23 @@ If \fIxterm\fP is compiled with the 16-color support disabled, it supports
 the following, from \fIrxvt\fP:
   \*(Ps = \*1\*0\*0 \(-> Set foreground and background color to default.
 .sP
-If 88- or 256-color support is compiled, the following apply.
+\fIXterm\fP maintains a color palette whose entries are identified by an index beginning with zero.
+If 88- or 256-color support is compiled, the following apply:
+.RS
+.bP
+All parameters are decimal integers.
+.bP
+RGB values range from zero (0) to 255.
+.bP
+ISO-8613-3 can be interpreted in more than one way;
+\fIxterm\fP allows the semicolons in this control to be replaced by colons
+(but after the first colon, colons must be used).
+.RE
+.sP
+These ISO-8613-3 controls are supported:
+  \*(Ps = \*3\*8 ; \*2 ; \*(Pr ; \*(Pg ; \*(Pb \(-> Set foreground color to the closest match in \fIxterm\fP's palette for the given RGB \*(Pr/\*(Pg/\*(Pb.
   \*(Ps = \*3\*8 ; \*5 ; \*(Ps \(-> Set foreground color to the second \*(Ps.
+  \*(Ps = \*4\*8 ; \*2 ; \*(Pr ; \*(Pg ; \*(Pb \(-> Set background color to the closest match in \fIxterm\fP's palette for the given RGB \*(Pr/\*(Pg/\*(Pb.
   \*(Ps = \*4\*8 ; \*5 ; \*(Ps \(-> Set background color to the second \*(Ps.
 .sp
 .
@@ -1210,9 +1227,11 @@ Load LEDs (DECLL).
 Set cursor style (DECSCUSR, VT520).
   \*(Ps = \*0 \(-> blinking block.
   \*(Ps = \*1 \(-> blinking block (default).
-  \*(Ps = \*2 \(-> steady block.
-  \*(Ps = \*3 \(-> blinking underline.
-  \*(Ps = \*4 \(-> steady underline.
+  \*(Ps = \*2 \(-> steady block.
+  \*(Ps = \*3 \(-> blinking underline.
+  \*(Ps = \*4 \(-> steady underline.
+  \*(Ps = \*5 \(-> blinking bar (xterm).
+  \*(Ps = \*6 \(-> steady bar (xterm).
 .
 .IP \\*(Cs\\*(Ps\\*s\\*(c"\\*q
 Select character protection attribute (DECSCA).
@@ -1262,8 +1281,11 @@ Omitted parameters reuse the current height or width.
 Zero parameters use the display's height or width.
   \*(Ps = \*9\*s\*;\*s\*0 \(-> Restore maximized window.
   \*(Ps = \*9\*s\*;\*s\*1 \(-> Maximize window (i.e., resize to screen size).
+  \*(Ps = \*9\*s\*;\*s\*2 \(-> Maximize window vertically.
+  \*(Ps = \*9\*s\*;\*s\*3 \(-> Maximize window horizontally.
   \*(Ps = \*1\*0\*s\*;\*s\*0 \(-> Undo full-screen mode.
   \*(Ps = \*1\*0\*s\*;\*s\*1 \(-> Change to full-screen.
+  \*(Ps = \*1\*0\*s\*;\*s\*2 \(-> Toggle full-screen.
   \*(Ps = \*1\*1 \(-> Report \fIxterm\fP window state.
 If the \fIxterm\fP window is open (non-iconified), it returns \*(Cs\*1\*t.
 If the \fIxterm\fP window is iconified, it returns \*(Cs\*2\*t.
@@ -2094,6 +2116,8 @@ are defined in \fBxcharmouse.h\fP as follows:
 #define SET_EXT_MODE_MOUSE          1005
 #define SET_SGR_EXT_MODE_MOUSE      1006
 #define SET_URXVT_EXT_MODE_MOUSE    1015
+
+#define SET_ALTERNATE_SCROLL        1007
 .DE
 .br
 The motion reporting modes are strictly \fIxterm\fP extensions, and are not
@@ -2147,6 +2171,16 @@ Those buttons are represented by the same event codes
 as buttons 1 and 2 respectively,
 except that 64 is added to the event code.
 Release events for the wheel buttons are not reported.
+By default,
+the wheel mouse events are translated to \fIscroll-back\fP
+and \fIscroll-forw\fP actions.
+Those actions normally scroll the whole window,
+as if the scrollbar was used.
+However if Alternate Scroll mode is set,
+then cursor up/down controls are sent when the terminal is displaying
+the alternate screen.
+The initial state of Alternate Scroll mode is set
+using the \fBalternateScroll\fP resource.
 .lP
 Mouse highlight tracking notifies a program of a button press, receives a
 range of lines from the program, highlights the region covered by

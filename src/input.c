@@ -1,4 +1,4 @@
-/* $XTermId: input.c,v 1.339 2012/06/26 09:11:01 tom Exp $ */
+/* $XTermId: input.c,v 1.341 2012/09/07 23:09:10 tom Exp $ */
 
 /*
  * Copyright 1999-2011,2012 by Thomas E. Dickey
@@ -224,15 +224,17 @@ AdjustAfterInput(XtermWidget xw)
  *      +--------+--------+--------+
  */
 static Bool
-IsEditKeypad(KeySym keysym)
+IsEditKeypad(XtermWidget xw, KeySym keysym)
 {
     Bool result;
 
     switch (keysym) {
+    case XK_Delete:
+	result = !xtermDeleteIsDEL(xw);
+	break;
     case XK_Prior:
     case XK_Next:
     case XK_Insert:
-    case XK_Delete:
     case XK_Find:
     case XK_Select:
 #ifdef DXK_Remove
@@ -252,7 +254,7 @@ IsEditKeypad(KeySym keysym)
  * other macros.
  */
 static Bool
-IsEditFunctionKey(KeySym keysym)
+IsEditFunctionKey(XtermWidget xw, KeySym keysym)
 {
     Bool result;
 
@@ -267,7 +269,7 @@ IsEditFunctionKey(KeySym keysym)
 	result = True;
 	break;
     default:
-	result = IsEditKeypad(keysym);
+	result = IsEditKeypad(xw, keysym);
 	break;
     }
     return result;
@@ -370,7 +372,7 @@ allowModifierParm(XtermWidget xw, KEY_DATA * kd)
     if (screen->vtXX_level != 0)
 #endif
     {
-	if (IsCursorKey(kd->keysym) || IsEditFunctionKey(kd->keysym)) {
+	if (IsCursorKey(kd->keysym) || IsEditFunctionKey(xw, kd->keysym)) {
 	    result = LegacyAllows(2);
 	} else if (IsKeypadKey(kd->keysym)) {
 	    if (keypad_mode) {
@@ -413,16 +415,16 @@ xtermParamToState(XtermWidget xw, unsigned param)
     if (param > MOD_NONE
 	&& ((ShiftMask
 	     | ControlMask
-	     | xw->misc.alt_mods
-	     | xw->misc.meta_mods) & xw->misc.other_mods) == 0) {
+	     | xw->work.alt_mods
+	     | xw->work.meta_mods) & xw->work.other_mods) == 0) {
 	if ((param - MOD_NONE) & MOD_SHIFT)
 	    UIntSet(result, ShiftMask);
 	if ((param - MOD_NONE) & MOD_CTRL)
 	    UIntSet(result, ControlMask);
 	if ((param - MOD_NONE) & MOD_ALT)
-	    UIntSet(result, xw->misc.alt_mods);
+	    UIntSet(result, xw->work.alt_mods);
 	if ((param - MOD_NONE) & MOD_META)
-	    UIntSet(result, xw->misc.meta_mods);
+	    UIntSet(result, xw->work.meta_mods);
     }
 #else
     (void) xw;
@@ -444,7 +446,7 @@ xtermStateToParam(XtermWidget xw, unsigned state)
 
     TRACE(("xtermStateToParam %#x\n", state));
 #if OPT_NUM_LOCK
-    if ((state & xw->misc.other_mods) == 0) {
+    if ((state & xw->work.other_mods) == 0) {
 	if (state & ShiftMask) {
 	    modify_parm += MOD_SHIFT;
 	    UIntClr(state, ShiftMask);
@@ -453,13 +455,13 @@ xtermStateToParam(XtermWidget xw, unsigned state)
 	    modify_parm += MOD_CTRL;
 	    UIntClr(state, ControlMask);
 	}
-	if ((state & xw->misc.alt_mods) != 0) {
+	if ((state & xw->work.alt_mods) != 0) {
 	    modify_parm += MOD_ALT;
-	    UIntClr(state, xw->misc.alt_mods);
+	    UIntClr(state, xw->work.alt_mods);
 	}
-	if ((state & xw->misc.meta_mods) != 0) {
+	if ((state & xw->work.meta_mods) != 0) {
 	    modify_parm += MOD_META;
-	    UIntClr(state, xw->misc.meta_mods);
+	    UIntClr(state, xw->work.meta_mods);
 	}
     }
     if (modify_parm == MOD_NONE)
@@ -524,7 +526,7 @@ static unsigned
 allowedCharModifiers(XtermWidget xw, unsigned state, KEY_DATA * kd)
 {
 #if OPT_NUM_LOCK
-    unsigned a_or_m = (state & (xw->misc.meta_mods | xw->misc.alt_mods));
+    unsigned a_or_m = (state & (xw->work.meta_mods | xw->work.alt_mods));
 #else
     unsigned a_or_m = 0;
 #endif
@@ -561,11 +563,11 @@ allowedCharModifiers(XtermWidget xw, unsigned state, KEY_DATA * kd)
 	}
 #if OPT_NUM_LOCK
 	result = filterAltMeta(result,
-			       xw->misc.meta_mods,
+			       xw->work.meta_mods,
 			       TScreenOf(xw)->meta_sends_esc, kd);
 	if (TScreenOf(xw)->alt_is_not_meta) {
 	    result = filterAltMeta(result,
-				   xw->misc.alt_mods,
+				   xw->work.alt_mods,
 				   TScreenOf(xw)->alt_sends_esc, kd);
 	}
 #endif
@@ -595,14 +597,14 @@ ModifyOtherKeys(XtermWidget xw,
      * Exclude the keys already covered by a modifier.
      */
     if (kd->is_fkey
-	|| IsEditFunctionKey(kd->keysym)
+	|| IsEditFunctionKey(xw, kd->keysym)
 	|| IsKeypadKey(kd->keysym)
 	|| IsCursorKey(kd->keysym)
 	|| IsPFKey(kd->keysym)
 	|| IsMiscFunctionKey(kd->keysym)
 	|| IsPrivateKeypadKey(kd->keysym)
 #if OPT_NUM_LOCK
-	|| (state & xw->misc.other_mods) != 0
+	|| (state & xw->work.other_mods) != 0
 #endif
 	) {
 	result = False;
@@ -949,7 +951,7 @@ Input(XtermWidget xw,
 	   IsPFKey(kd.keysym) ? " PFKey" : "",
 	   kd.is_fkey ? " FKey" : "",
 	   IsMiscFunctionKey(kd.keysym) ? " MiscFKey" : "",
-	   IsEditFunctionKey(kd.keysym) ? " EditFkey" : ""));
+	   IsEditFunctionKey(xw, kd.keysym) ? " EditFkey" : ""));
 
 #if OPT_SUNPC_KBD
     /*
@@ -995,7 +997,7 @@ Input(XtermWidget xw,
     if (kd.nbytes == 1
 	&& IsKeypadKey(kd.keysym)
 	&& xw->misc.real_NumLock
-	&& (xw->misc.num_lock & evt_state) != 0) {
+	&& (xw->work.num_lock & evt_state) != 0) {
 	keypad_mode = 0;
 	TRACE(("...Input num_lock, force keypad_mode off\n"));
     }
@@ -1154,7 +1156,7 @@ Input(XtermWidget xw,
 	modifyCursorKey(&reply,
 			((kd.is_fkey
 			  || IsMiscFunctionKey(kd.keysym)
-			  || IsEditFunctionKey(kd.keysym))
+			  || IsEditFunctionKey(xw, kd.keysym))
 			 ? keyboard->modify_now.function_keys
 			 : keyboard->modify_now.cursor_keys),
 			&modify_parm);
@@ -1162,7 +1164,7 @@ Input(XtermWidget xw,
 	unparseseq(xw, &reply);
     } else if (((kd.is_fkey
 		 || IsMiscFunctionKey(kd.keysym)
-		 || IsEditFunctionKey(kd.keysym))
+		 || IsEditFunctionKey(xw, kd.keysym))
 #if OPT_MOD_FKEYS
 		&& !ModifyOtherKeys(xw, evt_state, &kd, modify_parm)
 #endif
@@ -1308,9 +1310,9 @@ Input(XtermWidget xw,
 	     */
 	    if (kd.nbytes != 0) {
 		if (screen->meta_sends_esc
-		    && (evt_state & xw->misc.meta_mods) != 0) {
+		    && (evt_state & xw->work.meta_mods) != 0) {
 		    TRACE(("...input-char is modified by META\n"));
-		    UIntClr(evt_state, xw->misc.meta_mods);
+		    UIntClr(evt_state, xw->work.meta_mods);
 		    eightbit = False;
 		    prefix = ANSI_ESC;
 		} else if (eightbit) {
@@ -1318,8 +1320,8 @@ Input(XtermWidget xw,
 		    TRACE(("...input-char is shifted by META\n"));
 		}
 		if (screen->alt_is_not_meta
-		    && (evt_state & xw->misc.alt_mods) != 0) {
-		    UIntClr(evt_state, xw->misc.alt_mods);
+		    && (evt_state & xw->work.alt_mods) != 0) {
+		    UIntClr(evt_state, xw->work.alt_mods);
 		    if (screen->alt_sends_esc) {
 			TRACE(("...input-char is modified by ALT\n"));
 			eightbit = False;
@@ -1985,10 +1987,10 @@ addTranslation(XtermWidget xw, const char *fromString, const char *toString)
 }
 #endif
 
-#define SaveMask(name)	xw->misc.name |= (unsigned) mask;\
+#define SaveMask(name)	xw->work.name |= (unsigned) mask;\
 			TRACE(("SaveMask(%s) %#x (%#x is%s modifier)\n", \
 				#name, \
-				xw->misc.name, (unsigned) mask, \
+				xw->work.name, (unsigned) mask, \
 				ModifierName((unsigned) mask)));
 /*
  * Determine which modifier mask (if any) applies to the Num_Lock keysym.
@@ -2113,20 +2115,20 @@ VTInitModifiers(XtermWidget xw)
 	     * If the Alt modifier is used in translations, we would rather not
 	     * use it to modify function-keys when NumLock is active.
 	     */
-	    if ((xw->misc.alt_mods != 0)
+	    if ((xw->work.alt_mods != 0)
 		&& xtermHasTranslation(xw, "alt", True)) {
 		TRACE(("ALT is used as a modifier in translations (ignore mask)\n"));
-		xw->misc.alt_mods = 0;
+		xw->work.alt_mods = 0;
 	    }
 
 	    /*
 	     * If the Meta modifier is used in translations, we would rather not
 	     * use it to modify function-keys.
 	     */
-	    if ((xw->misc.meta_mods != 0)
+	    if ((xw->work.meta_mods != 0)
 		&& xtermHasTranslation(xw, "meta", True)) {
 		TRACE(("META is used as a modifier in translations\n"));
-		xw->misc.meta_mods = 0;
+		xw->work.meta_mods = 0;
 	    }
 	}
 

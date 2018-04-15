@@ -1,4 +1,4 @@
-/* $XTermId: ptyx.h,v 1.735 2012/06/24 18:45:38 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.755 2012/09/26 00:39:38 tom Exp $ */
 
 /*
  * Copyright 1999-2011,2012 by Thomas E. Dickey
@@ -391,6 +391,13 @@ typedef struct {
 	String desc;
 } OptionHelp;
 
+typedef	struct {
+	int	count;			/* number of values in params[]	*/
+	int	has_subparams;		/* true if there are any sub's	*/
+	int	is_sub[NPARAM];		/* true for subparam		*/
+	int	params[NPARAM];		/* parameter value		*/
+} PARAMS;
+
 typedef short ParmType;
 
 typedef struct {
@@ -512,6 +519,10 @@ typedef struct {
 
 #ifndef OPT_DEC_SOFTFONT
 #define OPT_DEC_SOFTFONT 0 /* true if xterm is configured for VT220 softfonts */
+#endif
+
+#ifndef OPT_DOUBLE_BUFFER
+#define OPT_DOUBLE_BUFFER 0 /* true if using double-buffering */
 #endif
 
 #ifndef OPT_EBCDIC
@@ -910,6 +921,15 @@ typedef enum {
     , esNever
 } FullscreenOps;
 
+#ifndef NO_ACTIVE_ICON
+typedef enum {
+    eiFalse = 0
+    , eiTrue
+    , eiDefault
+    , eiLAST
+} AIconOps;
+#endif
+
 typedef enum {
     etSetTcap = 1
     , etGetTcap
@@ -917,7 +937,7 @@ typedef enum {
 } TcapOps;
 
 typedef enum {
-    /* 1-21 are chosen to be the same as the control-sequence coding */
+    /* 1-23 are chosen to be the same as the control-sequence coding */
     ewRestoreWin = 1
     , ewMinimizeWin = 2
     , ewSetWinPosition = 3
@@ -1340,7 +1360,7 @@ typedef struct {
 	 * of widths.
 	 */
 typedef struct {
-    	Bool		mixed;
+	Bool		mixed;
 	Dimension	min_width;	/* nominal cell width for 0..255 */
 	Dimension	max_width;	/* maximum cell width */
 } FontMap;
@@ -1363,8 +1383,8 @@ typedef enum {
 } RenderFont;
 
 #define DefaultRenderFont(xw) \
-	if ((xw)->misc.render_font == erDefault) \
-	    (xw)->misc.render_font = erFalse
+	if ((xw)->work.render_font == erDefault) \
+	    (xw)->work.render_font = erFalse
 
 typedef struct {
 	XftFont *	font;
@@ -1381,6 +1401,7 @@ typedef struct {
 
 	/* indices into save_modes[] */
 typedef enum {
+	DP_ALTERNATE_SCROLL,
 	DP_ALT_SENDS_ESC,
 	DP_BELL_IS_URGENT,
 	DP_CRS_VISIBLE,
@@ -1469,6 +1490,7 @@ typedef enum {
 typedef struct {
 	String		resource;
 	Pixel		value;
+	unsigned short red, green, blue;
 	int		mode;		/* -1=invalid, 0=unset, 1=set   */
 } ColorRes;
 #else
@@ -1522,7 +1544,7 @@ typedef struct {
 } SavedCursor;
 
 typedef struct _SaveTitle {
-    	struct _SaveTitle *next;
+	struct _SaveTitle *next;
 	char		*iconName;
 	char		*windowName;
 } SaveTitle;
@@ -1560,6 +1582,9 @@ typedef struct {
 	int		f_ascent;	/* ascent of font in pixels	*/
 	int		f_descent;	/* descent of font in pixels	*/
 	SbInfo		sb_info;
+#if OPT_DOUBLE_BUFFER
+	Drawable	drawable;	/* X drawable id                */
+#endif
 #if OPT_TOOLBAR
 	Boolean		active;		/* true if toolbars are used	*/
 	TbInfo		tb_info;	/* toolbar information		*/
@@ -1597,6 +1622,26 @@ typedef struct {
 	XIC		xic;		/* input context attached to 'xim' */
 } TInput;
 #endif
+
+typedef enum {
+	CURSOR_BLOCK = 2
+	, CURSOR_UNDERLINE = 4
+	, CURSOR_BAR = 6
+} XtCursorShape;
+
+#define isCursorBlock(s)	((s)->cursor_shape == CURSOR_BLOCK)
+#define isCursorUnderline(s)	((s)->cursor_shape == CURSOR_UNDERLINE)
+#define isCursorBar(s)		((s)->cursor_shape == CURSOR_BAR)
+
+typedef enum {
+	DEFAULT_STYLE = 0
+	, BLINK_BLOCK
+	, STEADY_BLOCK
+	, BLINK_UNDERLINE
+	, STEADY_UNDERLINE
+	, BLINK_BAR
+	, STEADY_BAR
+} XtCursorStyle;
 
 typedef struct {
 /* These parameters apply to both windows */
@@ -1748,9 +1793,6 @@ typedef struct {
 
 	Boolean		awaitInput;	/* select-timeout mode		*/
 	Boolean		grabbedKbd;	/* keyboard is grabbed		*/
-#if OPT_MAXIMIZE
-	Boolean		fullscreen;	/* window is fullscreen		*/
-#endif
 #ifdef ALLOWLOGGING
 	int		logging;	/* logging mode			*/
 	int		logfd;		/* file descriptor of log	*/
@@ -1762,6 +1804,7 @@ typedef struct {
 /* VT window parameters */
 	Boolean		Vshow;		/* VT window showing		*/
 	VTwin		fullVwin;
+	int		needSwap;
 #ifndef NO_ACTIVE_ICON
 	VTwin		iconVwin;
 	VTwin		*whichVwin;
@@ -1784,7 +1827,7 @@ typedef struct {
 	Boolean		fnt_boxes;	/* true if font has box-chars	*/
 	Boolean		force_packed;	/* true to override proportional */
 #if OPT_BOX_CHARS
-	Boolean		force_box_chars;/* true if we assume that	*/
+	Boolean		force_box_chars;/* true if we assume no boxchars */
 	Boolean		force_all_chars;/* true to outline missing chars */
 	Boolean		allow_packing;	/* true to allow packed-fonts	*/
 #endif
@@ -1805,6 +1848,7 @@ typedef struct {
 	int		cursor_state;	/* ON, OFF, or BLINKED_OFF	*/
 	int		cursor_busy;	/* do not redraw...		*/
 	Boolean		cursor_underline; /* true if cursor is in underline mode */
+	XtCursorShape	cursor_shape;
 #if OPT_BLINK_CURS
 	Boolean		cursor_blink;	/* cursor blink enable		*/
 	Boolean		cursor_blink_res; /* initial cursor blink value	*/
@@ -1848,6 +1892,7 @@ typedef struct {
 	 * Working variables for getLineData().
 	 */
 	size_t		lineExtra;	/* extra space for combining chars */
+	Dimension	widestLine;	/* length of longest LineData	*/
 	/*
 	 * Pointer to the current visible buffer.
 	 */
@@ -1872,6 +1917,7 @@ typedef struct {
 	size_t		save_len;	/* ...and its length		*/
 
 	int		scrolllines;	/* number of lines to button scroll */
+	Boolean		alternateScroll; /* scroll-actions become keys */
 	Boolean		scrollttyoutput; /* scroll to bottom on tty output */
 	Boolean		scrollkey;	/* scroll to bottom on key	*/
 	Boolean		cursor_moved;	/* scrolling makes cursor move	*/
@@ -2291,6 +2337,7 @@ typedef struct _Misc {
     Boolean log_on;
 #endif
     Boolean login_shell;
+    Boolean palette_changed;
     Boolean re_verse;
     Boolean re_verse0;		/* initial value of "-rv" */
     XtGravity resizeGravity;
@@ -2309,7 +2356,8 @@ typedef struct _Misc {
     Boolean useRight;
 #endif
     Boolean titeInhibit;
-    Boolean tiXtraScroll;
+    Boolean tiXtraScroll;	/* scroll on ti/te */
+    Boolean cdXtraScroll;	/* scroll on cd (clear-display) */
     Boolean appcursorDefault;
     Boolean appkeypadDefault;
 #if OPT_INPUT_METHOD
@@ -2324,9 +2372,8 @@ typedef struct _Misc {
     TInput inputs[NINPUTWIDGETS];
 #endif
     Boolean dynamicColors;
-    Boolean shared_ic;
 #ifndef NO_ACTIVE_ICON
-    Boolean active_icon;	/* use application icon window  */
+    char *active_icon_s;	/* use application icon window  */
     unsigned icon_border_width;
     Pixel icon_border_pixel;
 #endif /* NO_ACTIVE_ICON */
@@ -2342,19 +2389,39 @@ typedef struct _Misc {
 #if OPT_NUM_LOCK
     Boolean real_NumLock;	/* true if we treat NumLock key specially */
     Boolean alwaysUseMods;	/* true if we always want f-key modifiers */
-    unsigned num_lock;		/* modifier for Num_Lock */
-    unsigned alt_mods;		/* modifier for Alt_L or Alt_R */
-    unsigned meta_mods;		/* modifier for Meta_L or Meta_R */
-    unsigned other_mods;	/* conflicting modifiers, e.g., Mode_Switch */
 #endif
 #if OPT_RENDERFONT
     char *face_name;
     char *face_wide_name;
     float face_size[NMENUFONTS];
     char *render_font_s;
-    Boolean render_font;
 #endif
 } Misc;
+
+typedef struct _Work {
+    int dummy;
+#ifndef NO_ACTIVE_ICON
+    int active_icon;		/* use application icon window  */
+#endif /* NO_ACTIVE_ICON */
+#if OPT_MAXIMIZE
+#define MAX_EWMH_MODE 3
+#define MAX_EWMH_DATA (1 + OPT_TEK4014)
+    struct {
+	int mode;		/* fullscreen, etc.		*/
+	Boolean checked[MAX_EWMH_MODE];
+	Boolean allowed[MAX_EWMH_MODE];
+    } ewmh[MAX_EWMH_DATA];
+#endif
+#if OPT_NUM_LOCK
+    unsigned num_lock;		/* modifier for Num_Lock */
+    unsigned alt_mods;		/* modifier for Alt_L or Alt_R */
+    unsigned meta_mods;		/* modifier for Meta_L or Meta_R */
+    unsigned other_mods;	/* conflicting modifiers, e.g., Mode_Switch */
+#endif
+#if OPT_RENDERFONT
+    Boolean render_font;
+#endif
+} Work;
 
 typedef struct {int foo;} XtermClassPart, TekClassPart;
 
@@ -2417,6 +2484,7 @@ typedef struct _XtermWidgetRec {
     unsigned	initflags;	/* initial mode flags		*/
     Tabs	tabs;		/* tabstops of the terminal	*/
     Misc	misc;		/* miscellaneous parameters	*/
+    Work	work;		/* workspace (no resources)	*/
 } XtermWidgetRec, *XtermWidget;
 
 #if OPT_TEK4014
@@ -2559,8 +2627,8 @@ typedef struct _TekWidgetRec {
 
 #define CursorX2(screen,col,fw) ((col) * (int)(fw) + OriginX(screen))
 #define CursorX(screen,col)     CursorX2(screen, col, FontWidth(screen))
-#define CursorY(screen,row)     ((INX2ROW(screen, row) * FontHeight(screen)) \
-				  + screen->border)
+#define CursorY2(screen,row)    (((row) * FontHeight(screen)) + screen->border)
+#define CursorY(screen,row)     CursorY2(screen, INX2ROW(screen, row))
 
 /*
  * These definitions depend on whether xterm supports active-icon.
@@ -2595,7 +2663,7 @@ typedef struct _TekWidgetRec {
 /*
  * Macro to check if we are iconified; do not use render for that case.
  */
-#define UsingRenderFont(xw)	(((xw)->misc.render_font == True) && !IsIcon(TScreenOf(xw)))
+#define UsingRenderFont(xw)	(((xw)->work.render_font == True) && !IsIcon(TScreenOf(xw)))
 
 /*
  * These definitions do not depend on whether xterm supports active-icon.
@@ -2604,6 +2672,12 @@ typedef struct _TekWidgetRec {
 #define VShellWindow(xw)	XtWindow(SHELL_OF(xw))
 #define TWindow(screen)		WhichTWin(screen)->window
 #define TShellWindow		XtWindow(SHELL_OF(tekWidget))
+
+#if OPT_DOUBLE_BUFFER
+#define VDrawable(screen)	(((screen)->needSwap=1), WhichVWin(screen)->drawable)
+#else
+#define VDrawable(screen)	VWindow(screen)
+#endif
 
 #define Width(screen)		WhichVWin(screen)->width
 #define Height(screen)		WhichVWin(screen)->height

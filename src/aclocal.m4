@@ -1,4 +1,4 @@
-dnl $XTermId: aclocal.m4,v 1.342 2012/06/26 09:57:45 tom Exp $
+dnl $XTermId: aclocal.m4,v 1.348 2012/09/29 00:24:28 tom Exp $
 dnl
 dnl ---------------------------------------------------------------------------
 dnl
@@ -2995,7 +2995,7 @@ AC_MSG_RESULT($APP_CLASS)
 AC_SUBST(APP_CLASS)
 ])dnl
 dnl ---------------------------------------------------------------------------
-dnl CF_WITH_APP_DEFAULTS version: 3 updated: 2012/06/19 20:58:54
+dnl CF_WITH_APP_DEFAULTS version: 4 updated: 2012/07/25 19:35:53
 dnl --------------------
 dnl Handle configure option "--with-app-defaults", setting these shell
 dnl variables:
@@ -3068,7 +3068,12 @@ AC_MSG_RESULT($APPSDIR)
 AC_SUBST(APPSDIR)
 
 no_appsdir=
-test "$APPSDIR" = no && no_appsdir="#"
+if test "$APPSDIR" = no
+then
+	no_appsdir="#"
+else
+	EXTRA_INSTALL_DIRS="$EXTRA_INSTALL_DIRS \$(APPSDIR)"
+fi
 AC_SUBST(no_appsdir)
 ])dnl
 dnl ---------------------------------------------------------------------------
@@ -3151,7 +3156,7 @@ then
 fi
 ])
 dnl ---------------------------------------------------------------------------
-dnl CF_WITH_ICONDIR version: 4 updated: 2012/06/21 21:03:13
+dnl CF_WITH_ICONDIR version: 5 updated: 2012/07/22 09:18:02
 dnl ---------------
 dnl Handle configure option "--with-icondir", setting these shell variables:
 dnl
@@ -3184,11 +3189,34 @@ AC_MSG_RESULT($ICONDIR)
 AC_SUBST(ICONDIR)
 
 no_icondir=
-test "$ICONDIR" = no && no_icondir="#"
+if test "$ICONDIR" = no
+then
+	no_icondir="#"
+else
+	EXTRA_INSTALL_DIRS="$EXTRA_INSTALL_DIRS \$(ICONDIR)"
+fi
 AC_SUBST(no_icondir)
 ])dnl
 dnl ---------------------------------------------------------------------------
-dnl CF_WITH_ICON_THEME version: 5 updated: 2012/06/26 05:55:35
+dnl CF_WITH_ICON_NAME version: 1 updated: 2012/08/25 19:05:08
+dnl -----------------
+dnl Allow a default icon-name to be overridden.
+dnl $1 = default icon name
+AC_DEFUN([CF_WITH_ICON_NAME],[
+AC_MSG_CHECKING(for the icon name)
+AC_ARG_WITH(icon-name,
+	[  --with-icon-name=XXXX   override icon name (default: $1)],
+	[ICON_NAME="$withval"],
+	[ICON_NAME=$1])
+case "x$ICON_NAME" in
+xyes|xno|x)
+	ICON_NAME=$1
+	;;
+esac
+AC_MSG_RESULT($ICON_NAME)
+])dnl
+dnl ---------------------------------------------------------------------------
+dnl CF_WITH_ICON_THEME version: 8 updated: 2012/08/07 20:14:58
 dnl ------------------
 dnl If asked, check for prerequisites and setup symbols to permit installing
 dnl one or more application icons in the Red Hat icon-theme directory
@@ -3247,23 +3275,24 @@ else
 	fi
 fi
 
-: ${ICON_FORMAT:=ifelse([$3],,[.svg .png .xpm],[$3])}
+: ${ICON_FORMAT:=ifelse([$3],,[".svg .png .xpm"],[$3])}
 
-ICON_NAME=
+# ICON_NAME=
 ICON_LIST=
 
 ifelse([$4],,[cf_icon_list=$1],[
 if test "x$ICON_THEME" != xno
 then
-	cf_icon_list=$1
+	cf_icon_list="$1"
 else
-	cf_icon_list=$4
+	cf_icon_list="$4"
 fi
 ])
 
 AC_MSG_CHECKING([for icon(s) to install])
 for cf_name in $cf_icon_list
 do
+	CF_VERBOSE(using $ICON_FORMAT)
 	for cf_suffix in $ICON_FORMAT
 	do
 		cf_icon="${cf_name}${cf_suffix}"
@@ -3285,14 +3314,11 @@ do
 		if test "x$ICON_THEME" != xno
 		then
 			cf_base=`basename $cf_left`
-			case "x${cf_icon}" in #(vi
+			cf_trim=`echo "$cf_base" | sed -e 's/_[[0-9]][[0-9]]x[[0-9]][[0-9]]\././'`
+			case "x${cf_base}" in #(vi
 			*:*) #(vi
+				cf_next=$cf_base
 				# user-defined mapping
-				;;
-			*_[[0-9]][[0-9]]*x[[0-9]][[0-9]]*.*) #(vi
-				cf_size=`echo "$cf_left"|sed -e 's/^.*_\([[0-9]][[0-9]]*x[[0-9]][[0-9]]*\)\..*$/\1/'`
-				cf_left=`echo "$cf_left"|sed -e 's/^\(.*\)_\([[0-9]][[0-9]]*x[[0-9]][[0-9]]*\)\(\..*\)$/\1\3/'`
-				cf_icon="${cf_icon}:$cf_size/apps/$cf_base"
 				;;
 			*.png) #(vi
 				cf_size=`file "$cf_left"|sed -e 's/^[[^:]]*://' -e 's/^.*[[^0-9]]\([[0-9]][[0-9]]* x [[0-9]][[0-9]]*\)[[^0-9]].*$/\1/' -e 's/ //g'`
@@ -3301,16 +3327,23 @@ do
 					AC_MSG_WARN(cannot determine size of $cf_left)
 					continue
 				fi
-				cf_icon="${cf_icon}:$cf_size/apps/$cf_base"
+				cf_next="$cf_size/apps/$cf_trim"
 				;;
 			*.svg) #(vi
-				cf_icon="${cf_icon}:scalable/apps/`basename $cf_icon`"
+				cf_next="scalable/apps/$cf_trim"
 				;;
 			*.xpm)
-				AC_MSG_WARN(ignored XPM file in icon theme)
+				CF_VERBOSE(ignored XPM file in icon theme)
 				continue
 				;;
+			*_[[0-9]][[0-9]]*x[[0-9]][[0-9]]*.*) #(vi
+				cf_size=`echo "$cf_left"|sed -e 's/^.*_\([[0-9]][[0-9]]*x[[0-9]][[0-9]]*\)\..*$/\1/'`
+				cf_left=`echo "$cf_left"|sed -e 's/^\(.*\)_\([[0-9]][[0-9]]*x[[0-9]][[0-9]]*\)\(\..*\)$/\1\3/'`
+				cf_next="$cf_size/apps/$cf_base"
+				;;
 			esac
+			CF_VERBOSE(adding $cf_next)
+			cf_icon="${cf_icon}:${cf_next}"
 		fi
 		test -n "$ICON_LIST" && ICON_LIST="$ICON_LIST "
 		ICON_LIST="$ICON_LIST${cf_icon}"
@@ -3320,7 +3353,13 @@ do
 		fi
 	done
 done
+
+if test -n "$verbose"
+then
+	AC_MSG_CHECKING(result)
+fi
 AC_MSG_RESULT($ICON_LIST)
+
 if test -z "$ICON_LIST"
 then
 	AC_MSG_ERROR(no icons found)
@@ -3473,7 +3512,7 @@ if test "$with_pcre" != no ; then
 fi
 ])dnl
 dnl ---------------------------------------------------------------------------
-dnl CF_WITH_PIXMAPDIR version: 2 updated: 2012/06/21 21:03:13
+dnl CF_WITH_PIXMAPDIR version: 3 updated: 2012/07/22 09:18:02
 dnl -----------------
 dnl Handle configure option "--with-pixmapdir", setting these shell variables:
 dnl
@@ -3506,8 +3545,51 @@ AC_MSG_RESULT($PIXMAPDIR)
 AC_SUBST(PIXMAPDIR)
 
 no_pixmapdir=
-test "$PIXMAPDIR" = no && no_pixmapdir="#"
+if test "$PIXMAPDIR" = no
+then
+	no_pixmapdir="#"
+else
+	EXTRA_INSTALL_DIRS="$EXTRA_INSTALL_DIRS \$(PIXMAPDIR)"
+fi
 AC_SUBST(no_pixmapdir)
+])dnl
+dnl ---------------------------------------------------------------------------
+dnl CF_WITH_XPM version: 2 updated: 2012/09/03 05:42:04
+dnl -----------
+dnl Test for Xpm library, update compiler/loader flags if it is wanted and
+dnl found.
+dnl
+dnl Also sets ICON_SUFFIX
+AC_DEFUN([CF_WITH_XPM],
+[
+ICON_SUFFIX=.xbm
+
+cf_save_cppflags="${CPPFLAGS}"
+cf_save_ldflags="${LDFLAGS}"
+
+AC_MSG_CHECKING(if you want to use the Xpm library for colored icon)
+AC_ARG_WITH(xpm,
+[  --with-xpm=DIR          use Xpm library for colored icon, may specify path],
+	[cf_Xpm_library="$withval"],
+	[cf_Xpm_library=yes])
+AC_MSG_RESULT($cf_Xpm_library)
+
+if test "$cf_Xpm_library" != no ; then
+    if test "$cf_Xpm_library" != yes ; then
+	CPPFLAGS="$CPPFLAGS -I$withval/include"
+	LDFLAGS="$LDFLAGS -L$withval/lib"
+    fi
+    AC_CHECK_HEADER(X11/xpm.h,[
+	AC_CHECK_LIB(Xpm, XpmCreatePixmapFromData,[
+	    AC_DEFINE(HAVE_LIBXPM)
+	    ICON_SUFFIX=.xpm
+	    LIBS="-lXpm $LIBS"],
+	    [CPPFLAGS="${cf_save_cppflags}" LDFLAGS="${cf_save_ldflags}"],
+	    [-lX11 $X_LIBS])],
+	[CPPFLAGS="${cf_save_cppflags}" LDFLAGS="${cf_save_ldflags}"])
+fi
+
+AC_SUBST(ICON_SUFFIX)
 ])dnl
 dnl ---------------------------------------------------------------------------
 dnl CF_XBOOL_RESULT version: 1 updated: 2012/06/04 20:23:25
@@ -3552,6 +3634,65 @@ AC_TRY_LINK([
 ],[cf_cv_xkb_bell_ext=yes],[cf_cv_xkb_bell_ext=no])
 ])
 test "$cf_cv_xkb_bell_ext" = yes && AC_DEFINE(HAVE_XKB_BELL_EXT)
+])
+dnl ---------------------------------------------------------------------------
+dnl CF_XKB_KEYCODE_TO_KEYSYM version: 2 updated: 2012/09/28 20:23:33
+dnl ------------------------
+dnl Some older vendor-unix systems made a practice of delivering fragments of
+dnl Xkb, requiring test-compiles.
+AC_DEFUN([CF_XKB_KEYCODE_TO_KEYSYM],[
+AC_CACHE_CHECK(if we can use XkbKeycodeToKeysym, cf_cv_xkb_keycode_to_keysym,[
+AC_TRY_COMPILE([
+#include <X11/Xlib.h>
+#include <X11/XKBlib.h>
+],[
+    KeySym keysym = XkbKeycodeToKeysym((Display *)0, 0, 0, 0);
+],[
+cf_cv_xkb_keycode_to_keysym=yes
+],[
+cf_cv_xkb_keycode_to_keysym=no
+])
+])
+
+if test $cf_cv_xkb_keycode_to_keysym = yes
+then
+	AC_CHECK_FUNCS(XkbKeycodeToKeysym)
+fi
+])
+dnl ---------------------------------------------------------------------------
+dnl CF_XKB_QUERY_EXTENSION version: 2 updated: 2012/09/28 20:23:46
+dnl ----------------------
+dnl see ifdef in scrollbar.c - iron out here
+AC_DEFUN([CF_XKB_QUERY_EXTENSION],[
+AC_CACHE_CHECK(if we can use XkbQueryExtension, cf_cv_xkb_query_extension,[
+AC_TRY_COMPILE([
+#include <X11/Xlib.h>
+#include <X11/extensions/XKB.h>
+#include <X11/XKBlib.h>
+],[
+	int xkbmajor = XkbMajorVersion;
+	int xkbminor = XkbMinorVersion;
+	int xkbopcode, xkbevent, xkberror;
+
+	if (XkbLibraryVersion(&xkbmajor, &xkbminor)
+	    && XkbQueryExtension((Display *)0,
+				 &xkbopcode,
+				 &xkbevent,
+				 &xkberror,
+				 &xkbmajor,
+				 &xkbminor))
+		 return 0;
+],[
+cf_cv_xkb_query_extension=yes
+],[
+cf_cv_xkb_query_extension=no
+])
+])
+
+if test $cf_cv_xkb_query_extension = yes
+then
+	AC_CHECK_FUNCS(XkbQueryExtension)
+fi
 ])
 dnl ---------------------------------------------------------------------------
 dnl CF_XOPEN_SOURCE version: 42 updated: 2012/01/07 08:26:49

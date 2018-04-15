@@ -1,4 +1,4 @@
-/* $XTermId: misc.c,v 1.591 2012/06/06 08:32:19 tom Exp $ */
+/* $XTermId: misc.c,v 1.614 2012/09/27 20:49:55 tom Exp $ */
 
 /*
  * Copyright 1999-2011,2012 by Thomas E. Dickey
@@ -75,6 +75,10 @@
 #include <X11/Xmu/Xmu.h>
 #if HAVE_X11_SUNKEYSYM_H
 #include <X11/Sunkeysym.h>
+#endif
+
+#ifdef HAVE_LIBXPM
+#include <X11/xpm.h>
 #endif
 
 #ifdef HAVE_LANGINFO_CODESET
@@ -821,7 +825,7 @@ HandleSpawnTerminal(Widget w GCC_UNUSED,
 	    myargv[n++] = child_exe;
 
 	    while (n < myargc) {
-		myargv[n++] = *params++;
+		myargv[n++] = (char *) *params++;
 	    }
 
 	    myargv[n] = 0;
@@ -1443,6 +1447,7 @@ QueryMaximize(XtermWidget xw, unsigned *width, unsigned *height)
     int root_y = -1;
     unsigned root_border;
     unsigned root_depth;
+    int code;
 
     if (XGetGeometry(screen->display,
 		     RootWindowOfScreen(XtScreen(xw)),
@@ -1479,9 +1484,13 @@ QueryMaximize(XtermWidget xw, unsigned *width, unsigned *height)
 	    if ((unsigned) hints.max_height < *height)
 		*height = (unsigned) hints.max_height;
 	}
-	return 1;
+	code = 1;
+    } else {
+	*width = 0;
+	*height = 0;
+	code = 0;
     }
-    return 0;
+    return code;
 }
 
 void
@@ -1490,67 +1499,88 @@ RequestMaximize(XtermWidget xw, int maximize)
     TScreen *screen = TScreenOf(xw);
     XWindowAttributes wm_attrs, vshell_attrs;
     unsigned root_width, root_height;
+    Boolean success = False;
 
-    TRACE(("RequestMaximize %s\n", maximize ? "maximize" : "restore"));
+    TRACE(("RequestMaximize %d:%s\n",
+	   maximize,
+	   (maximize
+	    ? "maximize"
+	    : "restore")));
 
-    if (maximize) {
+    /*
+     * Before any maximize, ensure that we can capture the current screensize
+     * as well as the estimated root-window size.
+     */
+    if (maximize
+	&& QueryMaximize(xw, &root_width, &root_height)
+	&& XGetWindowAttributes(screen->display,
+				WMFrameWindow(xw),
+				&wm_attrs)
+	&& XGetWindowAttributes(screen->display,
+				VShellWindow(xw),
+				&vshell_attrs)) {
 
-	if (QueryMaximize(xw, &root_width, &root_height)) {
-
-	    if (XGetWindowAttributes(screen->display,
-				     WMFrameWindow(xw),
-				     &wm_attrs)) {
-
-		if (XGetWindowAttributes(screen->display,
-					 VShellWindow(xw),
-					 &vshell_attrs)) {
-
-		    if (screen->restore_data != True
-			|| screen->restore_width != root_width
-			|| screen->restore_height != root_height) {
-			screen->restore_data = True;
-			screen->restore_x = wm_attrs.x + wm_attrs.border_width;
-			screen->restore_y = wm_attrs.y + wm_attrs.border_width;
-			screen->restore_width = (unsigned) vshell_attrs.width;
-			screen->restore_height = (unsigned) vshell_attrs.height;
-			TRACE(("HandleMaximize: save window position %d,%d size %d,%d\n",
-			       screen->restore_x,
-			       screen->restore_y,
-			       screen->restore_width,
-			       screen->restore_height));
-		    }
-
-		    /* subtract wm decoration dimensions */
-		    root_width -=
-			(unsigned) ((wm_attrs.width - vshell_attrs.width)
-				    + (wm_attrs.border_width * 2));
-		    root_height -=
-			(unsigned) ((wm_attrs.height - vshell_attrs.height)
-				    + (wm_attrs.border_width * 2));
-
-		    XMoveResizeWindow(screen->display, VShellWindow(xw),
-				      0 + wm_attrs.border_width,	/* x */
-				      0 + wm_attrs.border_width,	/* y */
-				      root_width,
-				      root_height);
-		}
-	    }
-	}
-    } else {
-	if (screen->restore_data) {
-	    TRACE(("HandleRestoreSize: position %d,%d size %d,%d\n",
+	if (screen->restore_data != True
+	    || screen->restore_width != root_width
+	    || screen->restore_height != root_height) {
+	    screen->restore_data = True;
+	    screen->restore_x = wm_attrs.x + wm_attrs.border_width;
+	    screen->restore_y = wm_attrs.y + wm_attrs.border_width;
+	    screen->restore_width = (unsigned) vshell_attrs.width;
+	    screen->restore_height = (unsigned) vshell_attrs.height;
+	    TRACE(("RequestMaximize: save window position %d,%d size %d,%d\n",
 		   screen->restore_x,
 		   screen->restore_y,
 		   screen->restore_width,
 		   screen->restore_height));
-	    screen->restore_data = False;
+	}
 
-	    XMoveResizeWindow(screen->display,
-			      VShellWindow(xw),
-			      screen->restore_x,
-			      screen->restore_y,
-			      screen->restore_width,
-			      screen->restore_height);
+	/* subtract wm decoration dimensions */
+	root_width -= (unsigned) ((wm_attrs.width - vshell_attrs.width)
+				  + (wm_attrs.border_width * 2));
+	root_height -= (unsigned) ((wm_attrs.height - vshell_attrs.height)
+				   + (wm_attrs.border_width * 2));
+	success = True;
+    } else if (screen->restore_data) {
+	success = True;
+    }
+
+    if (success) {
+	switch (maximize) {
+	case 3:
+	    FullScreen(xw, 3);	/* depends on EWMH */
+	    break;
+	case 2:
+	    FullScreen(xw, 2);	/* depends on EWMH */
+	    break;
+	case 1:
+	    FullScreen(xw, 0);	/* overrides any EWMH hint */
+	    XMoveResizeWindow(screen->display, VShellWindow(xw),
+			      0 + wm_attrs.border_width,	/* x */
+			      0 + wm_attrs.border_width,	/* y */
+			      root_width,
+			      root_height);
+	    break;
+
+	default:
+	    FullScreen(xw, 0);	/* reset any EWMH hint */
+	    if (screen->restore_data) {
+		screen->restore_data = False;
+
+		TRACE(("HandleRestoreSize: position %d,%d size %d,%d\n",
+		       screen->restore_x,
+		       screen->restore_y,
+		       screen->restore_width,
+		       screen->restore_height));
+
+		XMoveResizeWindow(screen->display,
+				  VShellWindow(xw),
+				  screen->restore_x,
+				  screen->restore_y,
+				  screen->restore_width,
+				  screen->restore_height);
+	    }
+	    break;
 	}
     }
 }
@@ -2369,8 +2399,15 @@ AllocateAnsiColor(XtermWidget xw,
 	} else {
 	    result = 1;
 	    SET_COLOR_RES(res, def.pixel);
-	    TRACE(("AllocateAnsiColor[%d] %s (pixel 0x%06lx)\n",
-		   (int) (res - TScreenOf(xw)->Acolors), spec, def.pixel));
+	    res->red = def.red;
+	    res->green = def.green;
+	    res->blue = def.blue;
+	    TRACE(("AllocateAnsiColor[%d] %s (rgb:%04x/%04x/%04x, pixel 0x%06lx)\n",
+		   (int) (res - TScreenOf(xw)->Acolors), spec,
+		   def.red,
+		   def.green,
+		   def.blue,
+		   def.pixel));
 #if OPT_COLOR_RES
 	    if (!res->mode)
 		result = 0;
@@ -2564,6 +2601,60 @@ xtermAllocColor(XtermWidget xw, XColor * def, const char *spec)
 	       def->red, def->green, def->blue));
 	result = True;
     }
+    return result;
+}
+
+/*
+ * This provides an approximation (the closest color from xterm's palette)
+ * rather than the "exact" color (whatever the display could provide, actually)
+ * because of the context in which it is used.
+ */
+#define ColorDiff(given,cache) ((long) ((cache) >> 8) - (long) (given))
+int
+xtermClosestColor(XtermWidget xw, int find_red, int find_green, int find_blue)
+{
+    int result = -1;
+#if OPT_COLOR_RES && OPT_ISO_COLORS
+    int n;
+    int best_index = -1;
+    unsigned long best_value = 0;
+    unsigned long this_value;
+    long diff_red, diff_green, diff_blue;
+
+    TRACE(("xtermClosestColor(%x/%x/%x)\n", find_red, find_green, find_blue));
+
+    for (n = NUM_ANSI_COLORS - 1; n >= 0; --n) {
+	ColorRes *res = &(TScreenOf(xw)->Acolors[n]);
+
+	/* ensure that we have a value for each of the colors */
+	if (!res->mode) {
+	    (void) AllocateAnsiColor(xw, res, res->resource);
+	}
+
+	/* find the closest match */
+	if (res->mode == True) {
+	    TRACE2(("...lookup %lx -> %x/%x/%x\n",
+		    res->value, res->red, res->green, res->blue));
+	    diff_red = ColorDiff(find_red, res->red);
+	    diff_green = ColorDiff(find_green, res->green);
+	    diff_blue = ColorDiff(find_blue, res->blue);
+	    this_value = (unsigned long) ((diff_red * diff_red)
+					  + (diff_green * diff_green)
+					  + (diff_blue * diff_blue));
+	    if (best_index < 0 || this_value < best_value) {
+		best_index = n;
+		best_value = this_value;
+	    }
+	}
+    }
+    TRACE(("...best match at %d with diff %lx\n", best_index, best_value));
+    result = best_index;
+#else
+    (void) xw;
+    (void) find_red;
+    (void) find_green;
+    (void) find_blue;
+#endif
     return result;
 }
 
@@ -3212,6 +3303,27 @@ do_osc(XtermWidget xw, Char * oscbuf, size_t len, int final)
     }
 
     /*
+     * Check if the palette changed and there are no more immediate changes
+     * that could be deferred to the next repaint.
+     */
+    if (xw->misc.palette_changed) {
+	switch (mode) {
+	case 3:		/* change X property */
+	case 30:		/* Konsole (unused) */
+	case 31:		/* Konsole (unused) */
+	case 50:		/* font operations */
+	case 51:		/* Emacs (unused) */
+#if OPT_PASTE64
+	case 52:		/* selection data */
+#endif
+	    TRACE(("forced repaint after palette changed\n"));
+	    xw->misc.palette_changed = False;
+	    xtermRepaint(xw);
+	    break;
+	}
+    }
+
+    /*
      * Most OSC controls other than resets require data.  Handle the others as
      * a special case.
      */
@@ -3280,14 +3392,14 @@ do_osc(XtermWidget xw, Char * oscbuf, size_t len, int final)
 	/* FALLTHRU */
     case 4:
 	if (ChangeAnsiColorRequest(xw, buf, ansi_colors, final))
-	    xtermRepaint(xw);
+	    xw->misc.palette_changed = True;
 	break;
     case OSC_Reset(5):
 	ansi_colors = NUM_ANSI_COLORS;
 	/* FALLTHRU */
     case OSC_Reset(4):
 	if (ResetAnsiColorRequest(xw, buf, ansi_colors))
-	    xtermRepaint(xw);
+	    xw->misc.palette_changed = True;
 	break;
 #endif
     case OSC_TEXT_FG:
@@ -3722,14 +3834,16 @@ do_dcs(XtermWidget xw, Char * dcsbuf, size_t dcslen)
 #endif
 		strcat(reply, "m");
 	    } else if (!strcmp(cp, " q")) {	/* DECSCUSR */
-		int code = 0;
-		if (screen->cursor_underline != 0)
-		    code |= 2;
+		int code = STEADY_BLOCK;
+		if (isCursorUnderline(screen))
+		    code = STEADY_UNDERLINE;
+		else if (isCursorBar(screen))
+		    code = STEADY_BAR;
 #if OPT_BLINK_CURS
 		if (screen->cursor_blink_esc == 0)
-		    code |= 1;
+		    code -= 1;
 #endif
-		sprintf(reply, "%d%s", code + 1, cp);
+		sprintf(reply, "%d%s", code, cp);
 	    } else
 		okay = False;
 
@@ -4053,6 +4167,9 @@ do_decrpm(XtermWidget xw, int nparams, int *params)
 	case SET_URXVT_EXT_MODE_MOUSE:
 	    result = MdBool(screen->extend_coords == params[0]);
 	    break;
+	case SET_ALTERNATE_SCROLL:
+	    result = MdBool(screen->alternateScroll);
+	    break;
 	case 1010:		/* rxvt */
 	    result = MdBool(screen->scrollttyoutput);
 	    break;
@@ -4162,6 +4279,131 @@ udk_lookup(int keycode, int *len)
 	return user_keys[keycode].str;
     }
     return 0;
+}
+
+#ifdef HAVE_LIBXPM
+
+#ifndef PIXMAP_ROOTDIR
+#define PIXMAP_ROOTDIR "/usr/share/pixmaps/"
+#endif
+
+static char *
+x_find_icon(char **work, int *state, const char *suffix)
+{
+    const char *filename = resource.icon_name;
+    const char *prefix = "";
+    char *result = 0;
+    size_t length;
+
+    switch (*state) {
+    case 0:
+	suffix = "";
+	break;
+    case 1:
+	break;
+    case 2:
+	if (!strncmp(filename, "/", (size_t) 1) ||
+	    !strncmp(filename, "./", (size_t) 2) ||
+	    !strncmp(filename, "../", (size_t) 3))
+	    goto giveup;
+	prefix = PIXMAP_ROOTDIR;
+	suffix = "";
+	break;
+    case 3:
+	prefix = PIXMAP_ROOTDIR;
+	break;
+      giveup:
+    default:
+	*state = -1;
+	break;
+    }
+    if (*state >= 0) {
+	if (*work) {
+	    free(*work);
+	    *work = 0;
+	}
+	length = 3 + strlen(prefix) + strlen(filename) + strlen(suffix);
+	if ((result = malloc(length)) != 0) {
+	    sprintf(result, "%s%s%s", prefix, filename, suffix);
+	    *work = result;
+	}
+	*state += 1;
+	TRACE(("x_find_icon %d:%s\n", *state, result));
+    }
+    return result;
+}
+#endif /* HAVE_LIBXPM */
+
+/*
+ * WM_ICON_SIZE should be honored if possible.
+ */
+void
+xtermLoadIcon(XtermWidget xw)
+{
+#ifdef HAVE_LIBXPM
+    Display *dpy = XtDisplay(xw);
+    Pixmap myIcon = 0;
+    char *workname = 0;
+
+    TRACE(("xtermLoadIcon %p:%s\n", (void *) xw, NonNull(resource.icon_name)));
+    /*
+     * Use the compiled-in icon as a resource default.
+     */
+    {
+#  include <icons/xterm.xpms>
+	size_t last = ((sizeof(xterm_xpms) / sizeof(xterm_xpms)) - 1);
+	if (XpmCreatePixmapFromData(dpy,
+				    DefaultRootWindow(dpy),
+				    (char **) xterm_xpms[last],
+				    &myIcon, 0, 0) != 0) {
+	    myIcon = 0;
+	}
+    }
+
+    if (!IsEmpty(resource.icon_name)) {
+	int state = 0;
+	while (x_find_icon(&workname, &state, ".xpm") != 0) {
+	    Pixmap resIcon = 0;
+	    Pixmap shapemask = 0;
+	    XpmAttributes attributes;
+
+	    attributes.depth = 1;
+	    attributes.valuemask = XpmDepth;
+
+	    if (XpmReadFileToPixmap(dpy,
+				    DefaultRootWindow(dpy),
+				    workname,
+				    &resIcon,
+				    &shapemask,
+				    &attributes) == XpmSuccess) {
+		myIcon = resIcon;
+		TRACE(("...success\n"));
+		break;
+	    }
+	}
+    }
+
+    if (myIcon != 0) {
+	XWMHints *hints = XGetWMHints(dpy, VShellWindow(xw));
+	if (!hints)
+	    hints = XAllocWMHints();
+
+	if (hints) {
+	    hints->flags = IconPixmapHint;
+	    hints->icon_pixmap = myIcon;
+
+	    XSetWMHints(dpy, VShellWindow(xw), hints);
+	    XFree(hints);
+	    TRACE(("...loaded icon\n"));
+	}
+    }
+
+    if (workname != 0)
+	free(workname);
+
+#else
+    (void) xw;
+#endif
 }
 
 void
