@@ -1,7 +1,7 @@
-/* $XTermId: print.c,v 1.155 2016/05/22 16:31:59 tom Exp $ */
+/* $XTermId: print.c,v 1.160 2017/05/30 00:36:31 tom Exp $ */
 
 /*
- * Copyright 1997-2014,2016 by Thomas E. Dickey
+ * Copyright 1997-2016,2017 by Thomas E. Dickey
  *
  *                         All Rights Reserved
  *
@@ -133,8 +133,12 @@ printLine(XtermWidget xw, int row, unsigned chr, PrinterFlags *p)
 #if OPT_ISO_COLORS && OPT_PRINT_COLORS
 #define ColorOf(ld,col) (ld->color[col])
 #endif
-    unsigned fg = NO_COLOR, last_fg = NO_COLOR;
-    unsigned bg = NO_COLOR, last_bg = NO_COLOR;
+    unsigned fg = NO_COLOR;
+    unsigned bg = NO_COLOR;
+#if OPT_PRINT_COLORS
+    unsigned last_fg = NO_COLOR;
+    unsigned last_bg = NO_COLOR;
+#endif
 
     ld = getLineData(screen, inx);
     if (ld == 0)
@@ -469,29 +473,31 @@ charToPrinter(XtermWidget xw, unsigned chr)
 		    if (SPS.fp != 0) {
 			FILE *input;
 			DEBUG_MSG("charToPrinter: opened pipe to printer\n");
-			input = fdopen(my_pipe[0], "r");
-			clearerr(input);
+			if ((input = fdopen(my_pipe[0], "r")) != 0) {
+			    clearerr(input);
 
-			for (;;) {
-			    int c;
+			    for (;;) {
+				int c;
 
-			    if (ferror(input)) {
-				DEBUG_MSG("charToPrinter: break on ferror\n");
-				break;
-			    } else if (feof(input)) {
-				DEBUG_MSG("charToPrinter: break on feof\n");
-				break;
-			    } else if ((c = fgetc(input)) == EOF) {
-				DEBUG_MSG("charToPrinter: break on EOF\n");
-				break;
+				if (ferror(input)) {
+				    DEBUG_MSG("charToPrinter: break on ferror\n");
+				    break;
+				} else if (feof(input)) {
+				    DEBUG_MSG("charToPrinter: break on feof\n");
+				    break;
+				} else if ((c = fgetc(input)) == EOF) {
+				    DEBUG_MSG("charToPrinter: break on EOF\n");
+				    break;
+				}
+				fputc(c, SPS.fp);
+				if (isForm(c))
+				    fflush(SPS.fp);
 			    }
-			    fputc(c, SPS.fp);
-			    if (isForm(c))
-				fflush(SPS.fp);
 			}
-
 			DEBUG_MSG("charToPrinter: calling pclose\n");
 			pclose(SPS.fp);
+			if (input)
+			    fclose(input);
 		    }
 		    exit(0);
 		} else {
