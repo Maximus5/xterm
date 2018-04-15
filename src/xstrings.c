@@ -1,7 +1,7 @@
-/* $XTermId: xstrings.c,v 1.50 2012/03/30 10:54:12 tom Exp $ */
+/* $XTermId: xstrings.c,v 1.56 2013/01/09 01:43:09 tom Exp $ */
 
 /*
- * Copyright 2000-2011,2012 by Thomas E. Dickey
+ * Copyright 2000-2012,2013 by Thomas E. Dickey
  *
  *                         All Rights Reserved
  *
@@ -64,10 +64,6 @@ x_basename(char *name)
     char *cp;
 
     cp = strrchr(name, '/');
-#ifdef __UNIXOS2__
-    if (cp == 0)
-	cp = strrchr(name, '\\');
-#endif
     return (cp ? cp + 1 : name);
 }
 
@@ -168,6 +164,7 @@ login_alias(char *login_name, uid_t uid, struct passwd *in_out)
 		/* use the other passwd-data including shell */
 		alloc_pw(in_out, &pw2);
 	    } else {
+		free(login_name);
 		login_name = NULL;
 	    }
 	}
@@ -188,6 +185,7 @@ x_getlogin(uid_t uid, struct passwd *in_out)
 
     login_name = login_alias(x_getenv("LOGNAME"), uid, in_out);
     if (IsEmpty(login_name)) {
+	free(login_name);
 	login_name = login_alias(x_getenv("USER"), uid, in_out);
     }
 #ifdef HAVE_GETLOGIN
@@ -199,14 +197,15 @@ x_getlogin(uid_t uid, struct passwd *in_out)
      */
     if (IsEmpty(login_name)) {
 	TRACE2(("...try getlogin\n"));
-	login_name = login_alias(getlogin(), uid, in_out);
+	free(login_name);
+	login_name = login_alias(x_strdup(getlogin()), uid, in_out);
     }
 #endif
 
-    if (IsEmpty(login_name))
-	login_name = in_out->pw_name;
-    if (!IsEmpty(login_name))
-	login_name = x_strdup(login_name);
+    if (IsEmpty(login_name)) {
+	free(login_name);
+	login_name = x_strdup(in_out->pw_name);
+    }
 
     TRACE2(("x_getloginid ->%s\n", NonNull(login_name)));
     return login_name;
@@ -303,6 +302,14 @@ x_skip_nonblanks(String s)
     return s;
 }
 
+static const char *
+skip_blanks(const char *s)
+{
+    while (isspace(CharOf(*s)))
+	++s;
+    return s;
+}
+
 /*
  * Split a command-string into an argv[]-style array.
  */
@@ -312,17 +319,18 @@ x_splitargs(const char *command)
     char **result = 0;
 
     if (command != 0) {
-	char *blob = x_strdup(command);
+	const char *first = skip_blanks(command);
+	char *blob = x_strdup(first);
 	size_t count;
 	size_t n;
 	int state;
 	int pass;
 
 	for (pass = 0; pass < 2; ++pass) {
-	    for (n = count = 0, state = 0; command[n] != '\0'; ++n) {
+	    for (n = count = 0, state = 0; first[n] != '\0'; ++n) {
 		switch (state) {
 		case 0:
-		    if (!isspace(CharOf(command[n]))) {
+		    if (!isspace(CharOf(first[n]))) {
 			state = 1;
 			if (pass)
 			    result[count] = blob + n;
@@ -332,7 +340,7 @@ x_splitargs(const char *command)
 		    }
 		    break;
 		case 1:
-		    if (isspace(CharOf(command[n]))) {
+		    if (isspace(CharOf(first[n]))) {
 			blob[n] = '\0';
 			state = 0;
 		    }
@@ -341,14 +349,29 @@ x_splitargs(const char *command)
 	    }
 	    if (!pass) {
 		result = TypeCallocN(char *, count + 1);
-		if (!result)
+		if (!result) {
+		    free(blob);
 		    break;
+		}
 	    }
 	}
     } else {
 	result = TypeCalloc(char *);
     }
     return result;
+}
+
+/*
+ * Free storage allocated by x_splitargs().
+ */
+void
+x_freeargs(char **argv)
+{
+    if (argv != 0) {
+	if (*argv != 0)
+	    free(*argv);
+	free(argv);
+    }
 }
 
 int
@@ -426,17 +449,19 @@ x_strtrim(const char *source)
 
     if (source != 0 && *source != '\0') {
 	char *t = x_strdup(source);
-	s = t;
-	d = s;
-	while (isspace(CharOf(*s)))
-	    ++s;
-	while ((*d++ = *s++) != '\0') {
-	    ;
-	}
-	if (*t != '\0') {
-	    s = t + strlen(t);
-	    while (s != t && isspace(CharOf(s[-1]))) {
-		*--s = '\0';
+	if (t != 0) {
+	    s = t;
+	    d = s;
+	    while (isspace(CharOf(*s)))
+		++s;
+	    while ((*d++ = *s++) != '\0') {
+		;
+	    }
+	    if (*t != '\0') {
+		s = t + strlen(t);
+		while (s != t && isspace(CharOf(s[-1]))) {
+		    *--s = '\0';
+		}
 	    }
 	}
 	result = t;

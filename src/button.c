@@ -1,4 +1,4 @@
-/* $XTermId: button.c,v 1.435 2012/11/20 01:15:57 tom Exp $ */
+/* $XTermId: button.c,v 1.446 2013/01/08 09:34:42 tom Exp $ */
 
 /*
  * Copyright 1999-2011,2012 by Thomas E. Dickey
@@ -1345,7 +1345,6 @@ parseItem(char *value, char *nextc)
     }
     *nextc = *nextp;
     *nextp = '\0';
-    x_strtrim(value);
 
     return nextp;
 }
@@ -1404,30 +1403,32 @@ overrideTargets(Widget w, String value, Atom ** resultp)
 		    count = 0;
 		    do {
 			char *nextp = parseItem(listp, &nextc);
-			size_t len = strlen(listp);
+			char *item = x_strtrim(listp);
+			size_t len = (item ? strlen(item) : 0);
 
 			if (len == 0) {
 			    /* EMPTY */ ;
 			}
 #if OPT_WIDE_CHARS
-			else if (sameItem(listp, "UTF8")) {
+			else if (sameItem(item, "UTF8")) {
 			    result[count++] = XA_UTF8_STRING(XtDisplay(w));
 			}
 #endif
-			else if (sameItem(listp, "I18N")) {
+			else if (sameItem(item, "I18N")) {
 			    if (screen->i18nSelections) {
 				result[count++] = XA_TEXT(XtDisplay(w));
 				result[count++] = XA_COMPOUND_TEXT(XtDisplay(w));
 			    }
-			} else if (sameItem(listp, "TEXT")) {
+			} else if (sameItem(item, "TEXT")) {
 			    result[count++] = XA_TEXT(XtDisplay(w));
-			} else if (sameItem(listp, "COMPOUND_TEXT")) {
+			} else if (sameItem(item, "COMPOUND_TEXT")) {
 			    result[count++] = XA_COMPOUND_TEXT(XtDisplay(w));
-			} else if (sameItem(listp, "STRING")) {
+			} else if (sameItem(item, "STRING")) {
 			    result[count++] = XA_STRING;
 			}
 			*nextp++ = nextc;
 			listp = nextp;
+			free(item);
 		    } while (nextc != '\0');
 		    if (count) {
 			result[count] = None;
@@ -1437,6 +1438,7 @@ overrideTargets(Widget w, String value, Atom ** resultp)
 			XtFree((char *) result);
 		    }
 		}
+		free(copied);
 	    } else {
 		TRACE(("Couldn't allocate copy of selection types\n"));
 	    }
@@ -1597,6 +1599,10 @@ MapSelections(XtermWidget xw, String * params, Cardinal num_params)
 					  : params[j]));
 		    if (result[j] == 0) {
 			UnmapSelections(xw);
+			while (j != 0) {
+			    free((void *) result[--j]);
+			}
+			free(result);
 			result = 0;
 			break;
 		    }
@@ -3771,8 +3777,10 @@ ConvertSelection(Widget w,
 
 	    *value = (XtPointer) targetP;
 
-	    while (*my_targets != None) {
-		*targetP++ = *my_targets++;
+	    if (my_targets != 0) {
+		while (*my_targets != None) {
+		    *targetP++ = *my_targets++;
+		}
 	    }
 	    *targetP++ = XA_LENGTH(dpy);
 	    *targetP++ = XA_LIST_LENGTH(dpy);
@@ -4502,6 +4510,7 @@ getDataFromScreen(XtermWidget xw, String method, CELL * start, CELL * finish)
     lookupSelectUnit(xw, 0, method);
     screen->selectUnit = screen->selectMap[0];
 
+    memset(start, 0, sizeof(*start));
     start->row = screen->cur_row;
     start->col = screen->cur_col;
     *finish = *start;
@@ -4617,6 +4626,7 @@ tokenizeFormat(String format)
 	    if (!pass) {
 		result = TypeCallocN(char *, argc + 1);
 		if (result == 0) {
+		    free(blob);
 		    break;
 		}
 	    }
@@ -4846,13 +4856,14 @@ HandleExecFormatted(Widget w,
 
 	    data = getSelectionString(xw, w, event, params, num_params,
 				      &start, &finish);
-	    argv = tokenizeFormat(params[0]);
-	    blob = argv[0];
-	    for (argc = 0; argv[argc] != 0; ++argc) {
-		argv[argc] = expandFormat(xw, argv[argc], data, &start, &finish);
+	    if ((argv = tokenizeFormat(params[0])) != 0) {
+		blob = argv[0];
+		for (argc = 0; argv[argc] != 0; ++argc) {
+		    argv[argc] = expandFormat(xw, argv[argc], data, &start, &finish);
+		}
+		executeCommand(argv);
+		freeArgv(blob, argv);
 	    }
-	    executeCommand(argv);
-	    freeArgv(blob, argv);
 	}
     }
 }
@@ -4876,14 +4887,18 @@ HandleExecSelectable(Widget w,
 	    int argc;
 
 	    data = getDataFromScreen(xw, params[1], &start, &finish);
-	    argv = tokenizeFormat(params[0]);
-	    blob = argv[0];
-	    for (argc = 0; argv[argc] != 0; ++argc) {
-		argv[argc] = expandFormat(xw, argv[argc], data, &start, &finish);
+	    if (data != 0) {
+		if ((argv = tokenizeFormat(params[0])) != 0) {
+		    blob = argv[0];
+		    for (argc = 0; argv[argc] != 0; ++argc) {
+			argv[argc] = expandFormat(xw, argv[argc], data,
+						  &start, &finish);
+		    }
+		    executeCommand(argv);
+		    freeArgv(blob, argv);
+		    free(data);
+		}
 	    }
-	    executeCommand(argv);
-	    freeArgv(blob, argv);
-	    free(data);
 	}
     }
 }
@@ -4903,11 +4918,14 @@ HandleInsertFormatted(Widget w,
 	    CELL start, finish;
 	    char *data;
 	    char *temp = x_strdup(params[0]);
+	    char *exps;
 
 	    data = getSelectionString(xw, w, event, params, num_params,
 				      &start, &finish);
-	    temp = expandFormat(xw, temp, data, &start, &finish);
-	    unparseputs(xw, temp);
+	    if ((exps = expandFormat(xw, temp, data, &start, &finish)) != 0) {
+		unparseputs(xw, exps);
+		free(exps);
+	    }
 	    free(data);
 	    free(temp);
 	}
@@ -4929,12 +4947,18 @@ HandleInsertSelectable(Widget w,
 	    CELL start, finish;
 	    char *data;
 	    char *temp = x_strdup(params[0]);
+	    char *exps;
 
 	    data = getDataFromScreen(xw, params[1], &start, &finish);
-	    temp = expandFormat(xw, temp, data, &start, &finish);
-	    unparseputs(xw, temp);
-	    free(data);
-	    free(temp);
+	    if (data != 0) {
+		exps = expandFormat(xw, temp, data, &start, &finish);
+		if (exps != 0) {
+		    unparseputs(xw, exps);
+		    free(exps);
+		}
+		free(data);
+		free(temp);
+	    }
 	}
     }
 }
