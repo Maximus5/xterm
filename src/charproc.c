@@ -1,4 +1,4 @@
-/* $XTermId: charproc.c,v 1.1420 2016/05/30 19:31:33 tom Exp $ */
+/* $XTermId: charproc.c,v 1.1422 2016/09/23 20:13:11 tom Exp $ */
 
 /*
  * Copyright 1999-2015,2016 by Thomas E. Dickey
@@ -236,6 +236,7 @@ static String _Font_Selected_ = "yes";	/* string is arbitrary */
 static const char *defaultTranslations;
 /* *INDENT-OFF* */
 static XtActionsRec actionsList[] = {
+    { "allow-bold-fonts",	HandleAllowBoldFonts },
     { "allow-send-events",	HandleAllowSends },
     { "bell",			HandleBell },
     { "clear-saved-lines",	HandleClearSavedLines },
@@ -1144,7 +1145,7 @@ resetCharsets(TScreen *screen)
 
 #if OPT_VT52_MODE
     if (screen->vtXX_level == 0)
-	screen->gsets[1] = '0';	/* Graphics             */
+	screen->gsets[1] = nrc_DEC_Spec_Graphic;	/* Graphics */
 #endif
 }
 
