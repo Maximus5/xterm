@@ -1,4 +1,4 @@
-/* $XTermId: util.c,v 1.504 2009/10/11 20:23:19 tom Exp $ */
+/* $XTermId: util.c,v 1.510 2009/11/09 10:09:58 tom Exp $ */
 
 /*
  * Copyright 1999-2008,2009 by Thomas E. Dickey
@@ -104,33 +104,53 @@ int
 DamagedCells(TScreen * screen, unsigned n, int *klp, int *krp, int row, int col)
 {
     LineData *ld = getLineData(screen, row);
-    int kl = col;
-    int kr = col + (int) n;
+    int result = False;
 
-    if (ld->charData[kl] == HIDDEN_CHAR) {
-	while (kl > 0) {
-	    if (ld->charData[--kl] != HIDDEN_CHAR) {
-		break;
-	    }
+    assert(ld);
+    if (col < (int) ld->lineSize) {
+	int nn = (int) n;
+	int kl = col;
+	int kr = col + nn;
+
+	if (kr >= ld->lineSize) {
+	    nn = (ld->lineSize - col - 1);
+	    kr = col + nn;
 	}
-    } else {
-	kl = col + 1;
-    }
-    if (ld->charData[kr] == HIDDEN_CHAR) {
-	while (kr < screen->max_col) {
-	    if (ld->charData[++kr] != HIDDEN_CHAR) {
-		--kr;
-		break;
+
+	if (nn > 0) {
+	    assert(kl < ld->lineSize);
+	    if (ld->charData[kl] == HIDDEN_CHAR) {
+		while (kl > 0) {
+		    if (ld->charData[--kl] != HIDDEN_CHAR) {
+			break;
+		    }
+		}
+	    } else {
+		kl = col + 1;
 	    }
+
+	    assert(kr < (int) ld->lineSize);
+	    if (ld->charData[kr] == HIDDEN_CHAR) {
+		while (kr < screen->max_col) {
+		    assert((kr + 1) < (int) ld->lineSize);
+		    if (ld->charData[++kr] != HIDDEN_CHAR) {
+			--kr;
+			break;
+		    }
+		}
+	    } else {
+		kr = col - 1;
+	    }
+
+	    if (klp)
+		*klp = kl;
+	    if (krp)
+		*krp = kr;
+	    result = (kr >= kl);
 	}
-    } else {
-	kr = col - 1;
     }
-    if (klp)
-	*klp = kl;
-    if (krp)
-	*krp = kr;
-    return (kr >= kl);
+
+    return result;
 }
 
 int
@@ -1307,8 +1327,8 @@ ClearLeft(XtermWidget xw)
 {
     TScreen *screen = &(xw->screen);
     unsigned len = (unsigned) screen->cur_col + 1;
-    assert(screen->cur_col >= 0);
 
+    assert(screen->cur_col >= 0);
     if (AddToVisible(xw)) {
 	if_OPT_WIDE_CHARS(screen, {
 	    int row = screen->cur_row;
@@ -3555,7 +3575,10 @@ getXtermCell(TScreen * screen, int row, int col)
 {
     LineData *ld = getLineData(screen, row);
 
-    return ld->charData[col];
+    assert(ld && (col < (int) ld->lineSize));
+    return ((ld && (col < (int) ld->lineSize))
+	    ? ld->charData[col]
+	    : (unsigned) ' ');
 }
 
 /*
@@ -3566,13 +3589,16 @@ putXtermCell(TScreen * screen, int row, int col, int ch)
 {
     LineData *ld = getLineData(screen, row);
 
-    ld->charData[col] = (CharData) ch;
-    if_OPT_WIDE_CHARS(screen, {
-	size_t off;
-	for_each_combData(off, ld) {
-	    ld->combData[off][col] = 0;
-	}
-    });
+    assert(ld && (col < (int) ld->lineSize));
+    if (ld && (col < (int) ld->lineSize)) {
+	ld->charData[col] = (CharData) ch;
+	if_OPT_WIDE_CHARS(screen, {
+	    size_t off;
+	    for_each_combData(off, ld) {
+		ld->combData[off][col] = 0;
+	    }
+	});
+    }
 }
 
 #if OPT_WIDE_CHARS

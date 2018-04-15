@@ -1,4 +1,4 @@
-/* $XTermId: ptyx.h,v 1.632 2009/10/10 13:02:16 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.637 2009/11/10 00:06:24 tom Exp $ */
 
 /*
  * Copyright 1999-2008,2009 by Thomas E. Dickey
@@ -827,6 +827,39 @@ typedef enum {
     ,NSELECTUNITS
 } SelectUnit;
 
+typedef enum {
+    /* 1-21 are chosen to be the same as the control-sequence coding */
+    ewRestoreWin = 1
+    , ewMinimizeWin = 2
+    , ewSetWinPosition = 3
+    , ewSetWinSizePixels = 4
+    , ewRaiseWin = 5
+    , ewLowerWin = 6
+    , ewRefreshWin = 7
+    , ewSetWinSizeChars = 8
+#if OPT_MAXIMIZE
+    , ewMaximizeWin = 9
+#endif
+    , ewGetWinState = 11
+    , ewGetWinPosition = 13
+    , ewGetWinSizePixels = 14
+    , ewGetWinSizeChars = 18
+#if OPT_MAXIMIZE
+    , ewGetScreenSizeChars = 19
+#endif
+    , ewGetIconTitle = 20
+    , ewGetWinTitle = 21
+    , ewPushTitle = 22
+    , ewPopTitle = 23
+    /* these do not fit into that scheme, which is why we use an array */
+    , ewSetWinLines
+    , ewSetXprop
+    , ewGetSelection
+    , ewSetSelection
+    /* get the size of the array... */
+    , ewLAST
+} WindowOps;
+
 #define	COLOR_DEFINED(s,w)	((s)->which & (1<<(w)))
 #define	COLOR_VALUE(s,w)	((s)->colors[w])
 #define	SET_COLOR_VALUE(s,w,v)	(((s)->colors[w] = (v)), ((s)->which |= (1<<(w))))
@@ -949,7 +982,7 @@ typedef enum {
 	/* Use remaining bits for encoding the other character-sets */
 #define CSET_NORMAL(code)  ((code) == CSET_SWL)
 #define CSET_DOUBLE(code)  (!CSET_NORMAL(code) && !CSET_EXTEND(code))
-#define CSET_EXTEND(code)  ((code) > CSET_DWL)
+#define CSET_EXTEND(code)  ((int)(code) > CSET_DWL)
 
 #define DBLCS_BITS            4
 #define DBLCS_MASK            BITS2MASK(DBLCS_BITS)
@@ -1331,6 +1364,12 @@ typedef struct {
 #endif
 } SavedCursor;
 
+typedef struct _SaveTitle {
+    	struct _SaveTitle *next;
+	char		*iconName;
+	char		*windowName;
+} SaveTitle;
+
 #define SAVED_CURSORS 2
 
 typedef struct {
@@ -1505,6 +1544,9 @@ typedef struct {
 	Boolean		allowTitleOp0;	/* initial TitleOps mode	*/
 	Boolean		allowWindowOp0;	/* initial WindowOps mode	*/
 
+	String		disallowedWinOps;
+	char		disallow_win_ops[ewLAST];
+
 	Boolean		awaitInput;	/* select-timeout mode		*/
 	Boolean		grabbedKbd;	/* keyboard is grabbed		*/
 #ifdef ALLOWLOGGING
@@ -1650,6 +1692,8 @@ typedef struct {
 					    used only with multiscroll	*/
 	SavedCursor	sc[SAVED_CURSORS]; /* data for restore cursor	*/
 	unsigned 	save_modes[DP_LAST]; /* save dec/xterm private modes */
+
+	SaveTitle	*save_title;
 
 	/* Improved VT100 emulation stuff.				*/
 	String		keyboard_dialect; /* default keyboard dialect	*/
@@ -2323,10 +2367,13 @@ typedef struct _TekWidgetRec {
 #define BorderPixel(w)		((w)->core.border_pixel)
 
 #define AllowXtermOps(w,name)	((w)->screen.name && !(w)->screen.allowSendEvents)
+
 #define AllowFontOps(w)		AllowXtermOps(w, allowFontOps)
 #define AllowTcapOps(w)		AllowXtermOps(w, allowTcapOps)
 #define AllowTitleOps(w)	AllowXtermOps(w, allowTitleOps)
-#define AllowWindowOps(w)	AllowXtermOps(w, allowWindowOps)
+
+#define AllowWindowOps(w,name)	(AllowXtermOps(w, allowWindowOps) || \
+				 !(w)->screen.disallow_win_ops[name])
 
 #if OPT_TOOLBAR
 #define ToolbarHeight(w)	((resource.toolBar) \

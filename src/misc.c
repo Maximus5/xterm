@@ -1,4 +1,4 @@
-/* $XTermId: misc.c,v 1.428 2009/10/12 00:44:44 tom Exp $ */
+/* $XTermId: misc.c,v 1.431 2009/11/11 00:25:16 tom Exp $ */
 
 /*
  *
@@ -1240,6 +1240,8 @@ RequestMaximize(XtermWidget termw, int maximize)
     XWindowAttributes wm_attrs, vshell_attrs;
     unsigned root_width, root_height;
 
+    TRACE(("RequestMaximize %s\n", maximize ? "maximize" : "restore"));
+
     if (maximize) {
 
 	if (QueryMaximize(termw, &root_width, &root_height)) {
@@ -2063,26 +2065,30 @@ ManipulateSelectionData(XtermWidget xw, TScreen * screen, char *buf, int final)
 	used[n] = 0;
 
 	if (!strcmp(buf, "?")) {
-	    TRACE(("Getting selection\n"));
-	    unparseputc1(xw, ANSI_OSC);
-	    unparseputs(xw, "52");
-	    unparseputc(xw, ';');
+	    if (AllowWindowOps(xw, ewGetSelection)) {
+		TRACE(("Getting selection\n"));
+		unparseputc1(xw, ANSI_OSC);
+		unparseputs(xw, "52");
+		unparseputc(xw, ';');
 
-	    unparseputs(xw, used);
-	    unparseputc(xw, ';');
+		unparseputs(xw, used);
+		unparseputc(xw, ';');
 
-	    /* Tell xtermGetSelection data is base64 encoded */
-	    screen->base64_paste = n;
-	    screen->base64_final = final;
+		/* Tell xtermGetSelection data is base64 encoded */
+		screen->base64_paste = n;
+		screen->base64_final = final;
 
-	    /* terminator will be written in this call */
-	    xtermGetSelection((Widget) xw, 0, select_args, n, NULL);
+		/* terminator will be written in this call */
+		xtermGetSelection((Widget) xw, 0, select_args, n, NULL);
+	    }
 	} else {
-	    TRACE(("Setting selection with %s\n", buf));
-	    ClearSelectionBuffer(screen);
-	    while (*buf != '\0')
-		AppendToSelectionBuffer(screen, CharOf(*buf++));
-	    CompleteSelection(xw, select_args, n);
+	    if (AllowWindowOps(xw, ewSetSelection)) {
+		TRACE(("Setting selection with %s\n", buf));
+		ClearSelectionBuffer(screen);
+		while (*buf != '\0')
+		    AppendToSelectionBuffer(screen, CharOf(*buf++));
+		CompleteSelection(xw, select_args, n);
+	    }
 	}
     }
 }
@@ -2440,7 +2446,7 @@ do_osc(XtermWidget xw, Char * oscbuf, unsigned len GCC_UNUSED, int final)
 	break;
 
     case 3:			/* change X property */
-	if (AllowWindowOps(xw))
+	if (AllowWindowOps(xw, ewSetXprop))
 	    ChangeXprop(buf);
 	break;
 #if OPT_ISO_COLORS
@@ -2567,8 +2573,7 @@ do_osc(XtermWidget xw, Char * oscbuf, unsigned len GCC_UNUSED, int final)
 
 #if OPT_PASTE64
     case 52:
-	if (AllowWindowOps(xw))
-	    ManipulateSelectionData(xw, screen, buf, final);
+	ManipulateSelectionData(xw, screen, buf, final);
 	break;
 #endif
 	/*
