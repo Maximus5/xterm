@@ -1,5 +1,5 @@
 '\" t
-.\" $XTermId: xterm.man,v 1.612 2015/07/20 09:22:41 tom Exp $
+.\" $XTermId: xterm.man,v 1.617 2015/08/28 08:48:38 tom Exp $
 .\"
 .\" Copyright 1996-2014,2015 by Thomas E. Dickey
 .\"
@@ -678,6 +678,7 @@ a reference, if available.
 Turn on the \fBuseInsertMode\fP resource,
 which forces use of insert mode by adding appropriate entries to the TERMCAP
 environment variable.
+(This option is ignored on most systems, because TERMCAP is not used).
 .TP 8
 .B +im
 Turn off the \fBuseInsertMode\fP resource.
@@ -1787,6 +1788,7 @@ i.e., \fI\*n\fP initializes the terminal to match that value.
 Force use of insert mode by adding appropriate entries to the TERMCAP
 environment variable.
 This is useful if the system termcap is broken.
+(This resource is ignored on most systems, because TERMCAP is not used).
 The default is \*(``false\*(''.
 .TP 8
 .B "utmpDisplayId (\fPclass\fB UtmpDisplayId)"
@@ -2793,10 +2795,10 @@ via a control sequence.
 The corresponding terminfo capabilities \fBsmm\fP (set meta mode)
 and \fBrmm\fP (reset meta mode)
 have been recognized by \fIbash\fP for some time.
-Interestingly enough, \fIbash\fP's notion of "meta mode"
+Interestingly enough, \fIbash\fP's notion of \*(``meta mode\*(''
 differs from the standard definition (in the \fIterminfo\fP manual),
 which describes the change to the eighth bit of a character.
-It happens that \fIbash\fP views "meta mode"
+It happens that \fIbash\fP views \*(``meta mode\*(''
 as the ESC character that \fI\*n\fP puts before a character when a
 special meta key is pressed.
 \fIbash\fP's early documentation talks about the ESC character
@@ -5781,8 +5783,14 @@ the content of the selection, unmodified.
 the length of the string that \*(``%t\*('' would insert.
 .TP 5
 %t
-the selection, trimmed of leading/trailing whitespace, and newlines
-changed to single spaces.
+the selection, trimmed of leading/trailing whitespace.
+Embedded spaces (and newlines) are copied as is.
+.TP 5
+%R
+the length of the string that \*(``%r\*('' would insert.
+.TP 5
+%r
+the selection, trimmed of trailing whitespace.
 .TP 5
 %V
 the video attributes at the beginning of the highlighted region,
@@ -7125,6 +7133,7 @@ Jim Gettys (MIT-Athena), Bob Scheifler (MIT X Consortium), Doug Mink (SAO),
 Steve Pitschke (Stellar), Ron Newman (MIT-Athena), Jim Fulton (MIT X
 Consortium), Dave Serisky (HP), Jonathan Kamens (MIT-Athena),
 Jason Bacon,
+Ross Combs,
 Stephen P. Wall,
 David Wexelblat, and
 Thomas Dickey (invisible-island.net).
