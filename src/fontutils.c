@@ -1,4 +1,4 @@
-/* $XTermId: fontutils.c,v 1.307 2009/08/07 23:22:32 tom Exp $ */
+/* $XTermId: fontutils.c,v 1.314 2009/09/30 09:37:45 tom Exp $ */
 
 /************************************************************
 
@@ -157,6 +157,37 @@ compatibleWideCounts(XFontStruct * wfs, XFontStruct * wbfs)
     return True;
 }
 #endif /* OPT_WIDE_CHARS */
+
+#if OPT_BOX_CHARS
+static void
+setupPackedFonts(XtermWidget xw)
+{
+    TScreen *screen = TScreenOf(xw);
+    Bool value = False;
+
+#if OPT_RENDERFONT
+#define MIXED(name) screen->name[fontnum].map.mixed
+    if (xw->misc.render_font) {
+	int fontnum = screen->menu_font_number;
+
+	screen->allow_packing = (Boolean) (MIXED(renderFontNorm)
+					   || MIXED(renderFontBold)
+					   || MIXED(renderFontItal)
+#if OPT_RENDERWIDE
+					   || MIXED(renderWideNorm)
+					   || MIXED(renderWideBold)
+					   || MIXED(renderWideItal)
+#endif
+	    );
+#undef MIXED
+    }
+#endif /* OPT_RENDERFONT */
+
+    value = screen->allow_packing;
+
+    SetItemSensitivity(fontMenuEntries[fontMenu_font_packedfont].widget, value);
+}
+#endif
 
 /*
  * Returns the fields from start to stop in a dash- separated string.  This
@@ -1090,7 +1121,11 @@ xtermLoadFont(XtermWidget xw,
 	}
     });
 
-    screen->fnt_prop = proportional;
+#if OPT_BOX_CHARS
+    screen->allow_packing = proportional;
+    setupPackedFonts(xw);
+#endif
+    screen->fnt_prop = (Boolean) (proportional && !(screen->force_packed));
     screen->fnt_boxes = True;
 
 #if OPT_BOX_CHARS
@@ -1438,6 +1473,87 @@ xtermSetCursorBox(TScreen * screen)
 
 #if OPT_RENDERFONT
 
+#if OPT_TRACE > 1
+static FcChar32
+xtermXftFirstChar(XftFont * xft)
+{
+    FcChar32 map[FC_CHARSET_MAP_SIZE];
+    FcChar32 next;
+    FcChar32 first;
+    int i;
+
+    first = FcCharSetFirstPage(xft->charset, map, &next);
+    for (i = 0; i < FC_CHARSET_MAP_SIZE; i++)
+	if (map[i]) {
+	    FcChar32 bits = map[i];
+	    first += i * 32;
+	    while (!(bits & 0x1)) {
+		bits >>= 1;
+		first++;
+	    }
+	    break;
+	}
+    return first;
+}
+
+static FcChar32
+xtermXftLastChar(XftFont * xft)
+{
+    FcChar32 this, last, next;
+    FcChar32 map[FC_CHARSET_MAP_SIZE];
+    int i;
+    last = FcCharSetFirstPage(xft->charset, map, &next);
+    while ((this = FcCharSetNextPage(xft->charset, map, &next)) != FC_CHARSET_DONE)
+	last = this;
+    last &= ~0xff;
+    for (i = FC_CHARSET_MAP_SIZE - 1; i >= 0; i--)
+	if (map[i]) {
+	    FcChar32 bits = map[i];
+	    last += i * 32 + 31;
+	    while (!(bits & 0x80000000)) {
+		last--;
+		bits <<= 1;
+	    }
+	    break;
+	}
+    return (long) last;
+}
+
+static void
+dumpXft(XtermWidget xw, XTermXftFonts * data)
+{
+    XftFont *xft = data->font;
+    TScreen *screen = TScreenOf(xw);
+    VTwin *win = WhichVWin(screen);
+
+    FcChar32 c;
+    FcChar32 first = xtermXftFirstChar(xft);
+    FcChar32 last = xtermXftLastChar(xft);
+    unsigned count = 0;
+    unsigned outside = 0;
+
+    TRACE(("dumpXft {{\n"));
+    TRACE(("   data range %#6x..%#6x\n", first, last));
+    for (c = first; c <= last; ++c) {
+	if (FcCharSetHasChar(xft->charset, c)) {
+	    int width = my_wcwidth((int) c);
+	    XGlyphInfo extents;
+
+	    XftTextExtents32(XtDisplay(xw), xft, &c, 1, &extents);
+	    TRACE(("%#6x  %2d  %.1f\n", c, width,
+		   ((double) extents.width) / win->f_width));
+	    if (extents.width > win->f_width)
+		++outside;
+	    ++count;
+	}
+    }
+    TRACE(("}} %u total, %u outside\n", count, outside));
+}
+#define DUMP_XFT(xw, data) dumpXft(xw, data)
+#else
+#define DUMP_XFT(xw, data)	/* nothing */
+#endif
+
 static void
 checkXft(XtermWidget xw, XTermXftFonts * data, XftFont * xft)
 {
@@ -1449,6 +1565,8 @@ checkXft(XtermWidget xw, XTermXftFonts * data, XftFont * xft)
     data->map.max_width = (Dimension) xft->max_advance_width;
 
     for (c = 32; c < 256; ++c) {
+	if (c >= 128 && c < 159)
+	    continue;
 	if (FcCharSetHasChar(xft->charset, c)) {
 	    XGlyphInfo extents;
 
@@ -1805,6 +1923,19 @@ xtermComputeFontInfo(XtermWidget xw,
 	    setRenderFontsize(screen, win, norm, NULL);
 	    setRenderFontsize(screen, win, bold, "bold");
 	    setRenderFontsize(screen, win, ital, "ital");
+#if OPT_BOX_CHARS
+	    setupPackedFonts(xw);
+
+	    if (screen->force_packed) {
+		XTermXftFonts *use = &(screen->renderFontNorm[fontnum]);
+		win->f_height = use->font->ascent + use->font->descent;
+		win->f_width = use->map.min_width;
+		TRACE(("...packed TrueType font %dx%d\n",
+		       win->f_height,
+		       win->f_width));
+	    }
+#endif
+	    DUMP_XFT(xw, &(screen->renderFontNorm[fontnum]));
 	}
     }
     /*
@@ -1813,7 +1944,7 @@ xtermComputeFontInfo(XtermWidget xw,
     if (!xw->misc.render_font || IsIconWin(screen, win))
 #endif /* OPT_RENDERFONT */
     {
-	if (is_double_width_font(font)) {
+	if (is_double_width_font(font) && !(screen->fnt_prop)) {
 	    win->f_width = (font->min_bounds.width);
 	} else {
 	    win->f_width = (font->max_bounds.width);

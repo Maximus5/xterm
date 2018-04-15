@@ -1,4 +1,4 @@
-/* $XTermId: xterm.h,v 1.582 2009/09/10 09:01:22 tom Exp $ */
+/* $XTermId: xterm.h,v 1.585 2009/10/01 09:04:48 tom Exp $ */
 
 /************************************************************
 
@@ -396,6 +396,7 @@ extern char **environ;
 #define XtNfontStyle		"fontStyle"
 #define XtNfontWarnings		"fontWarnings"
 #define XtNforceBoxChars	"forceBoxChars"
+#define XtNforcePackedFont	"forcePackedFont"
 #define XtNformatOtherKeys	"formatOtherKeys"
 #define XtNfreeBoldBox		"freeBoldBox"
 #define XtNhighlightColor	"highlightColor"
@@ -555,6 +556,7 @@ extern char **environ;
 #define XtCFontStyle		"FontStyle"
 #define XtCFontWarnings		"FontWarnings"
 #define XtCForceBoxChars	"ForceBoxChars"
+#define XtCForcePackedFont	"ForcePackedFont"
 #define XtCFormatOtherKeys	"FormatOtherKeys"
 #define XtCFreeBoldBox		"FreeBoldBox"
 #define XtCHighlightColorMode	"HighlightColorMode"
@@ -742,7 +744,10 @@ extern void ReadLineButton             PROTO_XT_ACTIONS_ARGS;
 #if OPT_WIDE_CHARS
 extern Bool iswide(int  /* i */);
 #define FIRST_WIDECHAR 256
-#define isWide(n) ((int) (n) >= FIRST_WIDECHAR && iswide(n))
+#define WideCells(n) (((IChar)(n) >= FIRST_WIDECHAR) ? my_wcwidth((wchar_t) (n)) : 1)
+#define isWide(n)    (((IChar)(n) >= FIRST_WIDECHAR) && iswide(n))
+#else
+#define WideCells(n) 1
 #endif
 
 /* cachedCgs.c */
@@ -771,6 +776,7 @@ extern int VTInit (XtermWidget /* xw */);
 extern int v_write (int  /* f */, Char * /* d */, unsigned  /* len */);
 extern void FindFontSelection (XtermWidget /* xw */, const char * /* atom_name */, Bool  /* justprobe */);
 extern void HideCursor (void);
+extern void RestartBlinking(TScreen * /* screen */);
 extern void ShowCursor (void);
 extern void SwitchBufPtrs (TScreen * /* screen */);
 extern void ToggleAlternate (XtermWidget /* xw */);

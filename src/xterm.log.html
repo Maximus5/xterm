@@ -20,7 +20,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF   *
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.            *
  *****************************************************************************
-  $XTermId: xterm.log.html,v 1.790 2009/09/11 23:10:00 tom Exp $
+  $XTermId: xterm.log.html,v 1.802 2009/10/02 00:16:00 tom Exp $
   -->
 <HTML>
 <HEAD>
@@ -45,6 +45,7 @@ Most of these are summarized in the XFree86 CHANGELOG
 is the latest version of this file.
 
 <UL>
+<LI><A HREF="#xterm_249">Patch #249 - 2009/10/1</A>
 <LI><A HREF="#xterm_248">Patch #248 - 2009/9/11</A>
 <LI><A HREF="#xterm_247">Patch #247 - 2009/8/30</A>
 <LI><A HREF="#xterm_246">Patch #246 - 2009/8/16</A>
@@ -295,6 +296,56 @@ is the latest version of this file.
 <LI><A HREF="#xterm_02">Patch #2 - 1996/1/7</A>
 <LI><A HREF="#xterm_01">Patch #1 - 1996/1/6</A>
 </UL>
+
+<H1><A NAME="xterm_249">Patch #249 - 2009/10/1</A></H1>
+<ul>
+	<li>change default for <code>allowWindowOps</code> resource to false.
+	    <!-- on the other hand, gnome-terminal, pterm and rxvt-unicode
+	        leave most of the related functionality enabled ;-) -->
+
+	<li>add limit-checks for result of visual_width() function,
+	    needed from <a href="#xterm_242">patch #242</a> and
+	    exposed by #244 changes (Debian #548321).
+
+	<li>improve limit-checks in select/paste.
+
+	<li>fix a remaining bug from 
+	    <a href="#xterm_230">patch #230</a>
+	    changes for displaying multi-column
+	    characters in a proportional font (report by Chris Jones).
+
+	<li>add new resource forcePackedFont and menu entry "Packed Font" to
+	    control whether to use the font's minimum (default) or maximum
+	    width when those differ.  The workaround which xterm uses to
+	    accommodate proportional fonts is not necessary with certain
+	    fonts such as unifont which happen to store a mixture of
+	    multicolumn glyphs (report by Chris Jones).
+
+	<li>fix an (old) bug which did not restart the timer for blinking text
+	    if the only blinking text was temporarily scrolled out of view,
+	    e.g., using the scrollbar.
+
+	<li>fix an (old) flaw in the delete-line operation where the text which
+	    is scrolled into view while the display is scrolled up was not
+	    repainted.
+
+	<li>improve delete-line and insert-line operations, retaining selection
+	    when the selection does not intersect the deleted/inserted lines.
+
+	<li>fix an (old) off-by-one error when an application cleared above the
+	    cursor position while the display was scrolled up, that would leave
+	    an extra line of text uncleared.
+
+	<li>fix a similar problem where the double-size attribute would not be
+	    reset when clearing the screen while the display was scrolled up.
+
+	<li>fix an indexing error which would occur if an application cleared
+	    a line while the display was scrolled up and was also in UTF-8 mode
+	    (Redhat #524503).
+	    The error was from <a href="#xterm_228">patch #228</a>
+	    but more visible after
+	    changes from <a href="#xterm_244">patch #244</a>.
+</ul>
 
 <H1><A NAME="xterm_248">Patch #248 - 2009/9/11</A></H1>
 <ul>
