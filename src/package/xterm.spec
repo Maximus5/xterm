@@ -1,7 +1,7 @@
-# $XTermId: xterm.spec,v 1.32 2012/08/21 00:05:57 tom Exp $
+# $XTermId: xterm.spec,v 1.36 2012/10/09 00:31:06 tom Exp $
 Summary: X terminal emulator (development version)
 Name: xterm-dev
-Version: 282
+Version: 283
 Release: 1
 License: X11
 Group: User Interface/X
@@ -56,6 +56,9 @@ and its resource class, to avoid conflict with other packages.
 %define _iconsdir   %{_datadir}/icons
 %define _pixmapsdir %{_datadir}/pixmaps
 %define my_docdir   %{_datadir}/doc/xterm%{my_suffix}
+
+# no need for debugging symbols...
+%define debug_package %{nil}
 
 %setup -q -n xterm-%{version}
 
@@ -190,9 +193,12 @@ rm -rf $RPM_BUILD_ROOT
 %{_iconsdir}/hicolor/48x48/apps/xterm*.png
 %{_iconsdir}/hicolor/scalable/apps/xterm*.svg
 %endif
-%{_pixmapsdir}/xterm*.xpm
+%{_pixmapsdir}/*xterm*.xpm
 
 %changelog
+
+* Mon Oct 08 2012 Thomas E. Dickey
+- added to pixmapsdir
 
 * Fri Jun 15 2012 Thomas E. Dickey
 - modify to support icon theme

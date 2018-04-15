@@ -1,4 +1,4 @@
-/* $XTermId: misc.c,v 1.614 2012/09/27 20:49:55 tom Exp $ */
+/* $XTermId: misc.c,v 1.623 2012/10/09 00:24:42 tom Exp $ */
 
 /*
  * Copyright 1999-2011,2012 by Thomas E. Dickey
@@ -4287,44 +4287,45 @@ udk_lookup(int keycode, int *len)
 #define PIXMAP_ROOTDIR "/usr/share/pixmaps/"
 #endif
 
+typedef struct {
+    const char *name;
+    const char *const *data;
+} XPM_DATA;
+
 static char *
 x_find_icon(char **work, int *state, const char *suffix)
 {
     const char *filename = resource.icon_name;
-    const char *prefix = "";
+    const char *prefix = PIXMAP_ROOTDIR;
+    const char *larger = "_48x48";
     char *result = 0;
     size_t length;
 
-    switch (*state) {
-    case 0:
-	suffix = "";
-	break;
-    case 1:
-	break;
-    case 2:
-	if (!strncmp(filename, "/", (size_t) 1) ||
-	    !strncmp(filename, "./", (size_t) 2) ||
-	    !strncmp(filename, "../", (size_t) 3))
-	    goto giveup;
-	prefix = PIXMAP_ROOTDIR;
-	suffix = "";
-	break;
-    case 3:
-	prefix = PIXMAP_ROOTDIR;
-	break;
-      giveup:
-    default:
-	*state = -1;
-	break;
+    if (*state >= 0) {
+	if ((*state & 1) == 0)
+	    suffix = "";
+	if ((*state & 2) == 0)
+	    larger = "";
+	if ((*state & 4) == 0) {
+	    prefix = "";
+	} else if (!strncmp(filename, "/", (size_t) 1) ||
+		   !strncmp(filename, "./", (size_t) 2) ||
+		   !strncmp(filename, "../", (size_t) 3)) {
+	    *state = -1;
+	} else if (*state >= 8) {
+	    *state = -1;
+	}
     }
+
     if (*state >= 0) {
 	if (*work) {
 	    free(*work);
 	    *work = 0;
 	}
-	length = 3 + strlen(prefix) + strlen(filename) + strlen(suffix);
+	length = 3 + strlen(prefix) + strlen(filename) + strlen(larger) +
+	    strlen(suffix);
 	if ((result = malloc(length)) != 0) {
-	    sprintf(result, "%s%s%s", prefix, filename, suffix);
+	    sprintf(result, "%s%s%s%s", prefix, filename, larger, suffix);
 	    *work = result;
 	}
 	*state += 1;
@@ -4332,7 +4333,60 @@ x_find_icon(char **work, int *state, const char *suffix)
     }
     return result;
 }
+
+#if OPT_BUILTIN_XPMS
+static const XPM_DATA *
+BuiltInXPM(const XPM_DATA * table, Cardinal length)
+{
+    const char *find = resource.icon_name;
+    const XPM_DATA *result = 0;
+    if (!IsEmpty(find)) {
+	Cardinal n;
+	for (n = 0; n < length; ++n) {
+	    if (!x_strcasecmp(find, table[n].name)) {
+		result = table + n;
+		break;
+	    }
+	}
+
+	/*
+	 * As a fallback, check if the icon name matches without the lengths,
+	 * which are all _HHxWW format.
+	 */
+	if (result == 0) {
+	    const char *base = table[0].name;
+	    const char *last = strchr(base, '_');
+	    if (last != 0
+		&& !x_strncasecmp(find, base, (unsigned) (last - base))) {
+		result = table + length - 1;
+	    }
+	}
+    }
+    return result;
+}
+#endif /* OPT_BUILTIN_XPMS */
 #endif /* HAVE_LIBXPM */
+
+int
+getVisualDepth(XtermWidget xw)
+{
+    Display *display = TScreenOf(xw)->display;
+    XVisualInfo myTemplate, *visInfoPtr;
+    int numFound;
+    int result = 0;
+
+    myTemplate.visualid = XVisualIDFromVisual(DefaultVisual(display,
+							    XDefaultScreen(display)));
+    visInfoPtr = XGetVisualInfo(display, (long) VisualIDMask,
+				&myTemplate, &numFound);
+    if (visInfoPtr != 0) {
+	if (numFound != 0) {
+	    result = visInfoPtr->depth;
+	}
+	XFree(visInfoPtr);
+    }
+    return result;
+}
 
 /*
  * WM_ICON_SIZE should be honored if possible.
@@ -4343,22 +4397,18 @@ xtermLoadIcon(XtermWidget xw)
 #ifdef HAVE_LIBXPM
     Display *dpy = XtDisplay(xw);
     Pixmap myIcon = 0;
+    Pixmap myMask = 0;
     char *workname = 0;
+#if OPT_BUILTIN_XPMS
+#include <icons/mini.xterm.xpms>
+#include <icons/filled-xterm.xpms>
+#include <icons/xterm.xpms>
+#include <icons/xterm-color.xpms>
+#else
+#include <icons/mini.xterm_48x48.xpm>
+#endif
 
     TRACE(("xtermLoadIcon %p:%s\n", (void *) xw, NonNull(resource.icon_name)));
-    /*
-     * Use the compiled-in icon as a resource default.
-     */
-    {
-#  include <icons/xterm.xpms>
-	size_t last = ((sizeof(xterm_xpms) / sizeof(xterm_xpms)) - 1);
-	if (XpmCreatePixmapFromData(dpy,
-				    DefaultRootWindow(dpy),
-				    (char **) xterm_xpms[last],
-				    &myIcon, 0, 0) != 0) {
-	    myIcon = 0;
-	}
-    }
 
     if (!IsEmpty(resource.icon_name)) {
 	int state = 0;
@@ -4367,7 +4417,7 @@ xtermLoadIcon(XtermWidget xw)
 	    Pixmap shapemask = 0;
 	    XpmAttributes attributes;
 
-	    attributes.depth = 1;
+	    attributes.depth = (unsigned) getVisualDepth(xw);
 	    attributes.valuemask = XpmDepth;
 
 	    if (XpmReadFileToPixmap(dpy,
@@ -4377,9 +4427,40 @@ xtermLoadIcon(XtermWidget xw)
 				    &shapemask,
 				    &attributes) == XpmSuccess) {
 		myIcon = resIcon;
+		myMask = shapemask;
 		TRACE(("...success\n"));
 		break;
 	    }
+	}
+    }
+
+    /*
+     * If no external file was found, look for the name in the built-in table.
+     * If that fails, just use the biggest mini-icon.
+     */
+    if (myIcon == 0) {
+	char **data;
+#if OPT_BUILTIN_XPMS
+	const XPM_DATA *myData = 0;
+	myData = BuiltInXPM(mini_xterm_xpms, XtNumber(mini_xterm_xpms));
+	if (myData == 0)
+	    myData = BuiltInXPM(filled_xterm_xpms, XtNumber(filled_xterm_xpms));
+	if (myData == 0)
+	    myData = BuiltInXPM(xterm_color_xpms, XtNumber(xterm_color_xpms));
+	if (myData == 0)
+	    myData = BuiltInXPM(xterm_xpms, XtNumber(xterm_xpms));
+	if (myData == 0)
+	    myData = &mini_xterm_xpms[XtNumber(mini_xterm_xpms) - 1];
+	data = (char **) myData->data,
+#else
+	data = (char **) &mini_xterm_48x48_xpm;
+#endif
+	if (XpmCreatePixmapFromData(dpy,
+				    DefaultRootWindow(dpy),
+				    data,
+				    &myIcon, &myMask, 0) != 0) {
+	    myIcon = 0;
+	    myMask = 0;
 	}
     }
 
@@ -4391,6 +4472,10 @@ xtermLoadIcon(XtermWidget xw)
 	if (hints) {
 	    hints->flags = IconPixmapHint;
 	    hints->icon_pixmap = myIcon;
+	    if (myMask) {
+		hints->flags |= IconMaskHint;
+		hints->icon_mask = myMask;
+	    }
 
 	    XSetWMHints(dpy, VShellWindow(xw), hints);
 	    XFree(hints);
@@ -4742,7 +4827,6 @@ SysReasonMsg(int code)
 	{ ERROR_SCALLOC,	"Alloc: calloc() failed on base" },
 	{ ERROR_SCALLOC2,	"Alloc: calloc() failed on rows" },
 	{ ERROR_SAVE_PTR,	"ScrnPointers: malloc/realloc() failed" },
-	{ ERROR_MMALLOC,	"my_memmove: malloc/realloc failed" },
     };
     /* *INDENT-ON* */
 
