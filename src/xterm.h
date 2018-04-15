@@ -1,8 +1,8 @@
-/* $XTermId: xterm.h,v 1.493 2007/12/31 21:03:41 tom Exp $ */
+/* $XTermId: xterm.h,v 1.498 2008/01/30 00:50:07 tom Exp $ */
 
 /************************************************************
 
-Copyright 1999-2006,2007 by Thomas E. Dickey
+Copyright 1999-2007,2008 by Thomas E. Dickey
 
                         All Rights Reserved
 
@@ -429,6 +429,7 @@ extern char **environ;
 #define XtNnMarginBell		"nMarginBell"
 #define XtNnumLock		"numLock"
 #define XtNoldXtermFKeys	"oldXtermFKeys"
+#define XtNpointerMode		"pointerMode"
 #define XtNpointerColor		"pointerColor"
 #define XtNpointerColorBackground "pointerColorBackground"
 #define XtNpointerShape		"pointerShape"
@@ -571,6 +572,7 @@ extern char **environ;
 #define XtCMultiScroll		"MultiScroll"
 #define XtCNumLock		"NumLock"
 #define XtCOldXtermFKeys	"OldXtermFKeys"
+#define XtCPointerMode		"PointerMode"
 #define XtCPopOnBell		"PopOnBell"
 #define XtCPrintAttributes	"PrintAttributes"
 #define XtCPrinterAutoClose	"PrinterAutoClose"
@@ -726,13 +728,13 @@ extern GC freeCgs(XtermWidget /*xw*/, VTwin * /*cgsWin*/, CgsEnum /*cgsId*/);
 extern GC getCgsGC(XtermWidget /*xw*/, VTwin * /*cgsWin*/, CgsEnum /*cgsId*/);
 extern Pixel getCgsBack(XtermWidget /*xw*/, VTwin * /*cgsWin*/, GC /*gc*/);
 extern Pixel getCgsFore(XtermWidget /*xw*/, VTwin * /*cgsWin*/, GC /*gc*/);
-extern XFontStruct * getCgsFont(XtermWidget /*xw*/, VTwin * /*cgsWin*/, GC /*gc*/);
-extern void clrCgsFonts(XtermWidget /*xw*/, VTwin * /*cgsWin*/, XFontStruct * /*font*/);
+extern XTermFonts * getCgsFont(XtermWidget /*xw*/, VTwin * /*cgsWin*/, GC /*gc*/);
+extern void clrCgsFonts(XtermWidget /*xw*/, VTwin * /*cgsWin*/, XTermFonts * /*font*/);
 extern void copyCgs(XtermWidget /*xw*/, VTwin * /*cgsWin*/, CgsEnum /*dstCgsId*/, CgsEnum /*srcCgsId*/);
 extern void redoCgs(XtermWidget /*xw*/, Pixel /*fg*/, Pixel /*bg*/, CgsEnum /*cgsId*/);
 extern void setCgsBack(XtermWidget /*xw*/, VTwin * /*cgsWin*/, CgsEnum /*cgsId*/, Pixel /*bg*/);
 extern void setCgsCSet(XtermWidget /*xw*/, VTwin * /*cgsWin*/, CgsEnum /*cgsId*/, unsigned /*cset*/);
-extern void setCgsFont(XtermWidget /*xw*/, VTwin * /*cgsWin*/, CgsEnum /*cgsId*/, XFontStruct * /*font*/);
+extern void setCgsFont(XtermWidget /*xw*/, VTwin * /*cgsWin*/, CgsEnum /*cgsId*/, XTermFonts * /*font*/);
 extern void setCgsFore(XtermWidget /*xw*/, VTwin * /*cgsWin*/, CgsEnum /*cgsId*/, Pixel /*fg*/);
 extern void swapCgs(XtermWidget /*xw*/, VTwin * /*cgsWin*/, CgsEnum /*dstCgsId*/, CgsEnum /*srcCgsId*/);
 
@@ -863,7 +865,6 @@ extern void show_8bit_control  (Bool  /* value */);
 /* misc.c */
 extern Bool AllocateTermColor(XtermWidget, ScrnColors *, int, const char *);
 extern Cursor make_colored_cursor (unsigned /* cursorindex */, unsigned long  /* fg */, unsigned long  /* bg */);
-extern Cursor make_hidden_cursor (void);
 extern OptionHelp * sortedOpts(OptionHelp *, XrmOptionDescRec *, Cardinal);
 extern Window WMFrameWindow(XtermWidget /* termw */);
 extern XrmOptionDescRec * sortedOptDescs(XrmOptionDescRec *, Cardinal);

@@ -1,4 +1,4 @@
-/* $XTermId: button.c,v 1.281 2007/12/31 21:11:05 tom Exp $ */
+/* $XTermId: button.c,v 1.283 2008/01/07 22:56:37 tom Exp $ */
 
 /*
  * Copyright 1999-2006,2007 by Thomas E. Dickey
@@ -3154,6 +3154,7 @@ ConvertSelection(Widget w,
 	return False;		/* can this happen? */
 
     if (*target == XA_TARGETS(dpy)) {
+	Atom *allocP;
 	Atom *targetP;
 	Atom *std_targets;
 	XPointer std_return = 0;
@@ -3165,8 +3166,12 @@ ConvertSelection(Widget w,
 					&std_length, format)) {
 	    std_targets = (Atom *) (std_return);
 	    *length = std_length + 6;
+
 	    targetP = (Atom *) XtMalloc(sizeof(Atom) * (*length));
+	    allocP = targetP;
+
 	    *value = (XtPointer) targetP;
+
 	    *targetP++ = XA_STRING;
 	    *targetP++ = XA_TEXT(dpy);
 #ifdef X_HAVE_UTF8_STRING
@@ -3181,6 +3186,9 @@ ConvertSelection(Widget w,
 #endif
 	    *targetP++ = XA_LENGTH(dpy);
 	    *targetP++ = XA_LIST_LENGTH(dpy);
+
+	    *length = std_length + (targetP - allocP);
+
 	    memcpy(targetP, std_targets, sizeof(Atom) * std_length);
 	    XtFree((char *) std_targets);
 	    *type = XA_ATOM;

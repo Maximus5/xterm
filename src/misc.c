@@ -1,8 +1,8 @@
-/* $XTermId: misc.c,v 1.377 2007/12/31 21:11:20 tom Exp $ */
+/* $XTermId: misc.c,v 1.382 2008/01/27 15:37:18 tom Exp $ */
 
 /*
  *
- * Copyright 1999-2006,2007 by Thomas E. Dickey
+ * Copyright 1999-2007,2008 by Thomas E. Dickey
  *
  *                        All Rights Reserved
  *
@@ -109,14 +109,16 @@
 #if OPT_TEK4014
 #define OUR_EVENT(event,Type) \
 		(event.type == Type && \
-		  (event.xcrossing.window == XtWindow(XtParent(term)) || \
+		  (event.xcrossing.window == XtWindow(XtParent(xw)) || \
 		    (tekWidget && \
 		     event.xcrossing.window == XtWindow(XtParent(tekWidget)))))
 #else
 #define OUR_EVENT(event,Type) \
 		(event.type == Type && \
-		   (event.xcrossing.window == XtWindow(XtParent(term))))
+		   (event.xcrossing.window == XtWindow(XtParent(xw))))
 #endif
+
+static Cursor make_hidden_cursor(XtermWidget);
 
 #if OPT_EXEC_XTERM
 /* Like readlink(2), but returns a malloc()ed buffer, or NULL on
@@ -284,8 +286,10 @@ xtermDisplayCursor(XtermWidget xw)
 
     if (screen->Vshow) {
 	if (screen->hide_pointer) {
+	    TRACE(("Display hidden_cursor\n"));
 	    XDefineCursor(screen->display, VWindow(screen), screen->hidden_cursor);
 	} else {
+	    TRACE(("Display pointer_cursor\n"));
 	    recolor_cursor(screen,
 			   screen->pointer_cursor,
 			   T_COLOR(screen, MOUSE_FG),
@@ -301,6 +305,29 @@ xtermShowPointer(XtermWidget xw, Bool enable)
     static int tried = -1;
     TScreen *screen = TScreenOf(xw);
 
+#if OPT_TEK4014
+    if (TEK4014_SHOWN(xw))
+	enable = True;
+#endif
+
+    /*
+     * Whether we actually hide the pointer depends on the pointer-mode and
+     * the mouse-mode:
+     */
+    if (!enable) {
+	switch (screen->pointer_mode) {
+	case pNever:
+	    enable = True;
+	    break;
+	case pNoMouse:
+	    if (screen->send_mouse_pos != MOUSE_OFF)
+		enable = True;
+	    break;
+	case pAlways:
+	    break;
+	}
+    }
+
     if (enable) {
 	if (screen->hide_pointer) {
 	    screen->hide_pointer = False;
@@ -315,7 +342,7 @@ xtermShowPointer(XtermWidget xw, Bool enable)
 	}
     } else if (!(screen->hide_pointer) && (tried <= 0)) {
 	if (screen->hidden_cursor == 0) {
-	    screen->hidden_cursor = make_hidden_cursor();
+	    screen->hidden_cursor = make_hidden_cursor(xw);
 	}
 	if (screen->hidden_cursor == 0) {
 	    tried = 1;
@@ -401,24 +428,58 @@ xevents(void)
 	     (event.xany.type != KeyRelease) &&
 	     (event.xany.type != ButtonPress) &&
 	     (event.xany.type != ButtonRelease))) {
-	    xtermShowPointer(xw, True);
+
+	    /*
+	     * If the event is interesting (and not a keyboard event), turn the
+	     * mouse pointer back on.
+	     */
+	    if (screen->hide_pointer) {
+		switch (event.xany.type) {
+		case KeyPress:
+		case KeyRelease:
+		case ButtonPress:
+		case ButtonRelease:
+		    /* also these... */
+		case Expose:
+		case NoExpose:
+		case PropertyNotify:
+		    break;
+		default:
+		    xtermShowPointer(xw, True);
+		    break;
+		}
+	    }
+
 	    XtDispatchEvent(&event);
 	}
     } while ((input_mask = XtAppPending(app_con)) & XtIMXEvent);
 }
 
-Cursor
-make_hidden_cursor(void)
+static Cursor
+make_hidden_cursor(XtermWidget xw)
 {
-    TScreen *screen = TScreenOf(term);
+    TScreen *screen = TScreenOf(xw);
     Cursor c;
     Display *dpy = screen->display;
-    Font fn = XLoadFont(dpy, "fixed");
+    XFontStruct *fn;
 
     static XColor dummy;
 
+    /*
+     * Prefer nil2 (which is normally available) to "fixed" (which is supposed
+     * to be "always" available), since it's a smaller glyph in case the
+     * server insists on drawing _somethng_.
+     */
+    TRACE(("Ask for nil2 font\n"));
+    if ((fn = XLoadQueryFont(dpy, "nil2")) == 0) {
+	TRACE(("...Ask for fixed font\n"));
+	fn = XLoadQueryFont(dpy, "fixed");
+    }
+
     if (fn != 0) {
-	c = XCreateGlyphCursor(dpy, fn, fn, 'X', '.', &dummy, &dummy);
+	/* a space character seems to work as a cursor (dots are not needed) */
+	c = XCreateGlyphCursor(dpy, fn->fid, fn->fid, 'X', ' ', &dummy, &dummy);
+	XFreeFont(dpy, fn);
     } else {
 	c = 0;
     }

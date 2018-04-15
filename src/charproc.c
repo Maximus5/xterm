@@ -1,8 +1,8 @@
-/* $XTermId: charproc.c,v 1.824 2007/12/31 21:03:26 tom Exp $ */
+/* $XTermId: charproc.c,v 1.834 2008/01/27 17:39:53 tom Exp $ */
 
 /*
 
-Copyright 1999-2006,2007 by Thomas E. Dickey
+Copyright 1999-2007,2008 by Thomas E. Dickey
 
                         All Rights Reserved
 
@@ -450,6 +450,7 @@ static XtResource resources[] =
     Ires(XtNlimitResize, XtCLimitResize, misc.limit_resize, 1),
     Ires(XtNmultiClickTime, XtCMultiClickTime, screen.multiClickTime, MULTICLICKTIME),
     Ires(XtNnMarginBell, XtCColumn, screen.nmarginbell, N_MARGINBELL),
+    Ires(XtNpointerMode, XtCPointerMode, screen.pointer_mode, DEF_POINTER_MODE),
     Ires(XtNprinterControlMode, XtCPrinterControlMode,
 	 screen.printer_controlmode, 0),
     Ires(XtNvisualBellDelay, XtCVisualBellDelay, screen.visualBellDelay, 100),
@@ -497,7 +498,7 @@ static XtResource resources[] =
 #ifndef NO_ACTIVE_ICON
     Bres("activeIcon", "ActiveIcon", misc.active_icon, False),
     Ires("iconBorderWidth", XtCBorderWidth, misc.icon_border_width, 2),
-    Fres("iconFont", "IconFont", screen.fnt_icon, XtDefaultFont),
+    Fres("iconFont", "IconFont", screen.fnt_icon.fs, XtDefaultFont),
     Cres("iconBorderColor", XtCBorderColor, misc.icon_border_pixel, XtDefaultBackground),
 #endif				/* NO_ACTIVE_ICON */
 
@@ -2562,6 +2563,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 	    } else {
 		TRACE(("DECELR - Enable Locator Reports\n"));
 		screen->send_mouse_pos = DEC_LOCATOR;
+		xtermShowPointer(xw, True);
 		if (param[0] == 2) {
 		    screen->locator_reset = True;
 		} else {
@@ -2839,6 +2841,14 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 	    }
 	    break;
 #endif
+	case CASE_HIDE_POINTER:
+	    TRACE(("CASE_HIDE_POINTER\n"));
+	    if (nparam >= 1 && param[0] != DEFAULT) {
+		screen->pointer_mode = param[0];
+	    } else {
+		screen->pointer_mode = DEF_POINTER_MODE;
+	    }
+	    break;
 
 	case CASE_CSI_IGNORE:
 	    sp->parsestate = cigtable;
@@ -3718,7 +3728,8 @@ really_set_mousemode(XtermWidget xw,
 		     unsigned mode)
 {
     xw->screen.send_mouse_pos = enabled ? mode : MOUSE_OFF;
-    xtermShowPointer(xw, enabled);
+    if (xw->screen.send_mouse_pos != MOUSE_OFF)
+	xtermShowPointer(xw, True);
 }
 
 #define set_mousemode(mode) really_set_mousemode(xw, IsSM(), mode)
@@ -5457,6 +5468,7 @@ VTInitialize(Widget wrequest,
     init_Bres(screen.trim_selection);
 
     wnew->screen.pointer_cursor = request->screen.pointer_cursor;
+    init_Ires(screen.pointer_mode);
 
     init_Sres(screen.answer_back);
 
@@ -5491,7 +5503,7 @@ VTInitialize(Widget wrequest,
     init_Bres(screen.quiet_grab);
 
 #ifndef NO_ACTIVE_ICON
-    wnew->screen.fnt_icon = request->screen.fnt_icon;
+    wnew->screen.fnt_icon.fs = request->screen.fnt_icon.fs;
     init_Bres(misc.active_icon);
     init_Ires(misc.icon_border_width);
     wnew->misc.icon_border_pixel = request->misc.icon_border_pixel;
@@ -5947,8 +5959,14 @@ VTDestroy(Widget w GCC_UNUSED)
     TRACE_FREE_LEAK(screen->allbuf);
     TRACE_FREE_LEAK(screen->abuf_address);
     TRACE_FREE_LEAK(screen->altbuf);
+    TRACE_FREE_LEAK(screen->keyboard_dialect);
+    TRACE_FREE_LEAK(screen->term_id);
 #if OPT_WIDE_CHARS
     TRACE_FREE_LEAK(screen->draw_buf);
+#if OPT_LUIT_PROG
+    TRACE_FREE_LEAK(xw->misc.locale_str);
+    TRACE_FREE_LEAK(xw->misc.localefilter);
+#endif
 #endif
 #if OPT_INPUT_METHOD
     if (screen->xim) {
@@ -5961,6 +5979,9 @@ VTDestroy(Widget w GCC_UNUSED)
 #ifndef NO_ACTIVE_ICON
     releaseWindowGCs(xw, &(screen->iconVwin));
 #endif
+
+    if (screen->hidden_cursor)
+	XFreeCursor(screen->display, screen->hidden_cursor);
 
     xtermCloseFonts(xw, screen->fnts);
     noleaks_cachedCgs(xw);
@@ -5976,10 +5997,12 @@ VTDestroy(Widget w GCC_UNUSED)
     }
 #endif
 
+#if OPT_COLOR_RES
     /* free local copies of resource strings */
     for (n = 0; n < NCOLORS; ++n) {
 	FREE_LEAK(screen->Tcolors[n].resource);
     }
+#endif
 #if OPT_SELECT_REGEX
     for (n = 0; n < NSELECTUNITS; ++n) {
 	FREE_LEAK(screen->selectExpr[n]);
@@ -6040,7 +6063,7 @@ VTRealize(Widget w,
     }
 
     /* really screwed if we couldn't open default font */
-    if (!screen->fnts[fNorm]) {
+    if (!screen->fnts[fNorm].fs) {
 	fprintf(stderr, "%s:  unable to locate a suitable font\n",
 		xterm_name);
 	Exit(1);
@@ -6188,14 +6211,14 @@ VTRealize(Widget w,
     screen->event_mask = values->event_mask;
 
 #ifndef NO_ACTIVE_ICON
-    if (xw->misc.active_icon && screen->fnt_icon) {
+    if (xw->misc.active_icon && screen->fnt_icon.fs) {
 	int iconX = 0, iconY = 0;
 	Widget shell = SHELL_OF(xw);
 	VTwin *win = &(screen->iconVwin);
 
 	TRACE(("Initializing active-icon\n"));
 	XtVaGetValues(shell, XtNiconX, &iconX, XtNiconY, &iconY, (XtPointer) 0);
-	xtermComputeFontInfo(xw, &(screen->iconVwin), screen->fnt_icon, 0);
+	xtermComputeFontInfo(xw, &(screen->iconVwin), screen->fnt_icon.fs, 0);
 
 	/* since only one client is permitted to select for Button
 	 * events, we have to let the window manager get 'em...
@@ -6219,13 +6242,13 @@ VTRealize(Widget w,
 		      (XtPointer) 0);
 	XtRegisterDrawable(XtDisplay(xw), screen->iconVwin.window, w);
 
-	setCgsFont(xw, win, gcNorm, screen->fnt_icon);
+	setCgsFont(xw, win, gcNorm, &(screen->fnt_icon));
 	setCgsFore(xw, win, gcNorm, T_COLOR(screen, TEXT_FG));
 	setCgsBack(xw, win, gcNorm, T_COLOR(screen, TEXT_BG));
 
 	copyCgs(xw, win, gcBold, gcNorm);
 
-	setCgsFont(xw, win, gcNormReverse, screen->fnt_icon);
+	setCgsFont(xw, win, gcNormReverse, &(screen->fnt_icon));
 	setCgsFore(xw, win, gcNormReverse, T_COLOR(screen, TEXT_BG));
 	setCgsBack(xw, win, gcNormReverse, T_COLOR(screen, TEXT_FG));
 
@@ -7181,6 +7204,8 @@ VTReset(XtermWidget xw, Bool full, Bool saved)
 	screen->send_focus_pos = OFF;
 	screen->waitingForTrackInfo = False;
 	screen->eventMode = NORMAL;
+
+	xtermShowPointer(xw, True);
 
 	TabReset(xw->tabs);
 	xw->keyboard.flags = MODE_SRM;
