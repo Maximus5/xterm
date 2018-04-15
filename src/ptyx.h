@@ -1,4 +1,4 @@
-/* $XTermId: ptyx.h,v 1.484 2007/03/20 23:56:09 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.490 2007/06/13 21:49:29 tom Exp $ */
 
 /* $XFree86: xc/programs/xterm/ptyx.h,v 3.134 2006/06/19 00:36:51 dickey Exp $ */
 
@@ -89,7 +89,7 @@
 #define TypeCalloc(type)	TypeCalloc(type,1)
 
 #define TypeMallocN(type,n)	(type *)malloc(sizeof(type) * (n))
-#define TypeMalloc(type)	TypeMallocN(type,0)
+#define TypeMalloc(type)	TypeMallocN(type,1)
 
 #define TypeRealloc(type,n,p)	(type *)realloc(p, (n) * sizeof(type))
 
@@ -466,6 +466,10 @@ typedef struct {
 
 #ifndef OPT_EXEC_XTERM
 #define OPT_EXEC_XTERM 0 /* true if xterm can fork/exec copies of itself */
+#endif
+
+#ifndef OPT_EXTRA_PASTE
+#define OPT_EXTRA_PASTE 1
 #endif
 
 #ifndef OPT_FOCUS_EVENT
@@ -1287,6 +1291,9 @@ typedef struct {
 	uid_t		uid;		/* user id of actual person	*/
 	gid_t		gid;		/* group id of actual person	*/
 	ColorRes	Tcolors[NCOLORS]; /* terminal colors		*/
+#if OPT_HIGHLIGHT_COLOR
+	Boolean		hilite_reverse;	/* hilite overrides reverse	*/
+#endif
 #if OPT_ISO_COLORS
 	ColorRes	Acolors[MAXCOLORS]; /* ANSI color emulation	*/
 	int		veryBoldColors;	/* modifier for boldColors	*/
@@ -1379,8 +1386,10 @@ typedef struct {
 	Boolean		visualbell;	/* visual bell mode		*/
 	Boolean		poponbell;	/* pop on bell mode		*/
 	Boolean		allowSendEvents;/* SendEvent mode		*/
+	Boolean		allowTitleOps;	/* TitleOps mode		*/
 	Boolean		allowWindowOps;	/* WindowOps mode		*/
 	Boolean		allowSendEvent0;/* initial SendEvent mode	*/
+	Boolean		allowTitleOp0;	/* initial TitleOps mode	*/
 	Boolean		allowWindowOp0;	/* initial WindowOps mode	*/
 	Boolean		awaitInput;	/* select-timeout mode		*/
 	Boolean		grabbedKbd;	/* keyboard is grabbed		*/
@@ -1639,6 +1648,10 @@ typedef struct {
 #if OPT_CLIP_BOLD
 	Boolean		use_clipping;
 #endif
+	void *		main_cgs_cache;
+#ifndef NO_ACTIVE_ICON
+	void *		icon_cgs_cache;
+#endif
 #if OPT_RENDERFONT
 	XftFont *	renderFontNorm[NMENUFONTS];
 	XftFont *	renderFontBold[NMENUFONTS];
@@ -1808,6 +1821,8 @@ typedef struct _Misc {
 #if OPT_WIDE_CHARS
     Boolean cjk_width;		/* true for built-in CJK wcwidth() */
     Boolean mk_width;		/* true for simpler built-in wcwidth() */
+    int mk_samplesize;
+    int mk_samplepass;
 #endif
 #if OPT_LUIT_PROG
     Boolean callfilter;		/* true to invoke luit */

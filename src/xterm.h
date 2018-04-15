@@ -1,4 +1,4 @@
-/* $XTermId: xterm.h,v 1.461 2007/03/20 23:56:57 tom Exp $ */
+/* $XTermId: xterm.h,v 1.468 2007/06/17 15:19:19 tom Exp $ */
 
 /* $XFree86: xc/programs/xterm/xterm.h,v 3.117 2006/06/19 00:36:52 dickey Exp $ */
 
@@ -64,14 +64,6 @@ authorization.
 #ifdef CSRG_BASED
 /* Get definition of BSD */
 #include <sys/param.h>
-#endif
-
-#ifndef HAVE_X11_DECKEYSYM_H
-#define HAVE_X11_DECKEYSYM_H 1
-#endif
-
-#ifndef HAVE_X11_SUNKEYSYM_H
-#define HAVE_X11_SUNKEYSYM_H 1
 #endif
 
 #ifndef DFT_TERMTYPE
@@ -215,6 +207,18 @@ authorization.
 
 #endif /* HAVE_CONFIG_H */
 
+#ifndef HAVE_X11_DECKEYSYM_H
+#define HAVE_X11_DECKEYSYM_H 1
+#endif
+
+#ifndef HAVE_X11_SUNKEYSYM_H
+#define HAVE_X11_SUNKEYSYM_H 1
+#endif
+
+#ifndef HAVE_X11_XF86KEYSYM_H
+#define HAVE_X11_XF86KEYSYM_H 0
+#endif
+
 /***====================================================================***/
 
 /* if compiling with gcc -ansi -pedantic, we must fix POSIX definitions */
@@ -328,6 +332,7 @@ extern char **environ;
 
 #define XtNallowC1Printable	"allowC1Printable"
 #define XtNallowSendEvents	"allowSendEvents"
+#define XtNallowTitleOps	"allowTitleOps"
 #define XtNallowWindowOps	"allowWindowOps"
 #define XtNaltIsNotMeta		"altIsNotMeta"
 #define XtNaltSendsEscape	"altSendsEscape"
@@ -388,6 +393,7 @@ extern char **environ;
 #define XtNforceBoxChars	"forceBoxChars"
 #define XtNfreeBoldBox		"freeBoldBox"
 #define XtNhighlightColor	"highlightColor"
+#define XtNhighlightReverse	"highlightReverse"
 #define XtNhighlightSelection	"highlightSelection"
 #define XtNhighlightTextColor	"highlightTextColor"
 #define XtNhpLowerleftBugCompat	"hpLowerleftBugCompat"
@@ -408,6 +414,8 @@ extern char **environ;
 #define XtNmenuBar		"menuBar"
 #define XtNmenuHeight		"menuHeight"
 #define XtNmetaSendsEscape	"metaSendsEscape"
+#define XtNmkSamplePass		"mkSamplePass"
+#define XtNmkSampleSize		"mkSampleSize"
 #define XtNmkWidth		"mkWidth"
 #define XtNmodifyCursorKeys	"modifyCursorKeys"
 #define XtNmodifyFunctionKeys	"modifyFunctionKeys"
@@ -473,6 +481,7 @@ extern char **environ;
 
 #define XtCAllowC1Printable	"AllowC1Printable"
 #define XtCAllowSendEvents	"AllowSendEvents"
+#define XtCAllowTitleOps	"AllowTitleOps"
 #define XtCAllowWindowOps	"AllowWindowOps"
 #define XtCAltIsNotMeta		"AltIsNotMeta"
 #define XtCAltSendsEscape	"AltSendsEscape"
@@ -527,6 +536,7 @@ extern char **environ;
 #define XtCFontStyle		"FontStyle"
 #define XtCForceBoxChars	"ForceBoxChars"
 #define XtCFreeBoldBox		"FreeBoldBox"
+#define XtCHighlightReverse	"HighlightReverse"
 #define XtCHighlightSelection	"HighlightSelection"
 #define XtCHpLowerleftBugCompat	"HpLowerleftBugCompat"
 #define XtCI18nSelections	"I18nSelections"
@@ -544,6 +554,8 @@ extern char **environ;
 #define XtCMenuBar		"MenuBar"
 #define XtCMenuHeight		"MenuHeight"
 #define XtCMetaSendsEscape	"MetaSendsEscape"
+#define XtCMkSamplePass 	"MkSamplePass"
+#define XtCMkSampleSize 	"MkSampleSize"
 #define XtCMkWidth 		"MkWidth"
 #define XtCModifyCursorKeys	"ModifyCursorKeys"
 #define XtCModifyFunctionKeys	"ModifyFunctionKeys"
@@ -717,6 +729,10 @@ extern void setCgsFont(XtermWidget /*xw*/, VTwin * /*cgsWin*/, CgsEnum /*cgsId*/
 extern void setCgsFore(XtermWidget /*xw*/, VTwin * /*cgsWin*/, CgsEnum /*cgsId*/, Pixel /*fg*/);
 extern void swapCgs(XtermWidget /*xw*/, VTwin * /*cgsWin*/, CgsEnum /*dstCgsId*/, CgsEnum /*srcCgsId*/);
 
+#ifdef NO_LEAKS
+extern void noleaks_cachedCgs (XtermWidget /* xw */);
+#endif
+
 /* charproc.c */
 extern int VTInit (void);
 extern int v_write (int  /* f */, Char * /* d */, unsigned  /* len */);
@@ -881,6 +897,7 @@ extern void switch_modes (Bool  /* tovt */);
 extern void timestamp_filename(char * /* dst */, const char * /* src */);
 extern void xevents (void);
 extern void xt_error (String  /* message */);
+extern void xtermCopyEnv (char ** /* oldenv */);
 extern void xtermSetenv (char * /* var */, char * /* value */);
 
 #if OPT_DABBREV
@@ -1059,7 +1076,7 @@ extern void InsertLine (XtermWidget /* xw */, int  /* n */);
 extern void RevScroll (XtermWidget /* xw */, int  /* amount */);
 extern void ReverseVideo (XtermWidget  /* termw */);
 extern void decode_keyboard_type (XtermWidget /* xw */, struct XTERM_RESOURCE * /* rp */);
-extern void decode_wcwidth (int  /* mode */);
+extern void decode_wcwidth (int  /* mode */, int /* samplesize */, int /* samplepass */);
 extern void do_erase_display (XtermWidget /* xw */, int  /* param */, int  /* mode */);
 extern void do_erase_line (XtermWidget /* xw */, int  /* param */, int  /* mode */);
 extern void getXtermSizeHints (XtermWidget /* xw */);

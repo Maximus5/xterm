@@ -20,7 +20,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF   *
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.            *
  *****************************************************************************
-  $XTermId: xterm.log.html,v 1.545 2007/03/24 00:15:59 tom Exp $
+  $XTermId: xterm.log.html,v 1.577 2007/06/17 19:23:15 tom Exp $
   $XFree86: xc/programs/xterm/xterm.log.html,v 1.151 2006/06/20 00:42:38 dickey Exp $
   -->
 <HTML>
@@ -46,6 +46,7 @@ Most of these are summarized in the XFree86 CHANGELOG
 is the latest version of this file.
 
 <UL>
+<LI><A HREF="#xterm_226">Patch #226 - 2007/6/17</A>
 <LI><A HREF="#xterm_225">Patch #225 - 2007/3/24</A>
 <LI><A HREF="#xterm_224">Patch #224 - 2007/2/11</A>
 <LI><A HREF="#xterm_223">Patch #223 - 2006/11/30</A>
@@ -274,6 +275,124 @@ is the latest version of this file.
 <LI><A HREF="#xterm_01">Patch #1 - 1996/1/6</A>
 </UL>
 
+<H1><A NAME="xterm_226">Patch #226 - 2007/6/17</A></H1>
+<ul>
+	<li>add configure check to use <code>-Wno-unknown-pragmas</code> for
+	    Solaris, and a few other new gcc warning options to address
+	    regressions in its warning options.
+
+	<li>add sample desktop and icon files, along with configure options for
+	    manipulating them.
+
+	<li>fix an infinite loop when showing a 2-column character in a
+	    1-column screen (Debian #426863).
+
+	<li>add <code>XF86Paste</code> and <code>SunPaste</code> to the
+	    default translations (Debian #422521, patch by Bernhard R Link).
+
+	<li>update wcwidth.c (partly based on/prompted by mailing list
+	    comment).
+
+	<li>update/improve keysym2ucs.c based on Unicode 5.0.1d3 and Xorg
+	    7.1 keysymdef.h file.
+
+	<li>improve <code>gen-pc-fkeys.pl</code>, making it show all of the
+	    building-block terminfo entries used by xterm.
+
+	<li>correct strings used for modifiers applied to F1-F4 in xterm+pcf1
+	    terminfo entry.
+
+	<li>improve session management by adding the ICE connection number
+	    to the <code>select</code> call rather than waking up once per
+	    second (patch by Miroslav Lichvar).
+	    
+	<li>add environment variable <code>$XTERM_LOCALE</code> to help
+	    with shell initialization, e.g., to set a specific locale for
+	    xterm on systems where a global locale is set in the shell
+	    startup scripts.
+
+	<li>add resource settings <code>mkSampleSize</code> and
+	    <code>mkSamplePass</code>
+	    to modify the <code>mkWidth</code> added
+	    in <a href="#xterm_201">patch #201</a>.
+	    In <a href="#xterm_202">patch #202</a>,
+	    xterm would also check if the system's
+	    <code>wcwidth</code> matched its built-in tables
+	    "well enough" to be used when <code>mkWidth</code> was false,
+	    and if not would use the built-in tables anyway.
+	    These resources allow the user to customize the decision
+	    (prompted by comments by Emanuele Giaquinta)
+
+	<li>modify logic which resets/updates the screensize on the child
+	    process side of the pseudo-terminal to do this only if a
+	    successful handshake was received, e.g., as determined by
+	    the <code>waitForMap</code> resource (prompted by reports
+	    by Emanuele Giaquinta and Bernhard R Link, but see also
+	    <a href="#xterm_177">patch #177</a> and
+	    <a href="#xterm_159">patch #159</a>.
+
+	<li>improve permissions logic when closing pseudo-terminal
+	    (Debian #12261,
+	     patch by Nathanael Nerode,
+	     analysis by Richard Braakman).
+
+	<li>add resource <code>highlightReverse</code> which controls whether
+	    xterm will allow selection highlighting to hide reverse-video
+	    or use the older behavior which inverts the foreground and
+	    background colors when selected text with reverse-video attribute
+	    (report by Adam M Costello, comments by Victor Vaile).
+
+	<li>restore a special case for cursor-color in
+	    <code>ReverseVideo()</code>
+	    lost in rewrite for <a href="#xterm_224">patch #224</a>
+	    (report by Adam Sulmicki).
+
+	<li>correct initialization for menu entry for <code>bellIsUrgent</code> 
+	    (patch by Emanuele Giaquinta).
+
+	<li>correct length of underlining for double-width Xft fonts
+	    (report by Shidai Liu "Leo").
+
+	<li>correct clipping for double-width Xft fonts
+	    (report by Shidai Liu "Leo").
+
+	<li>modify initialization for <code>italicULMode</code> to avoid
+	    <code>XftPatternBuild</code> reusing bold attributes
+	    (report by Shidai Liu "Leo").
+
+	<li>add a check in case someone tries to call the
+	    <code>popup-menu()</code> action on a menu which is not initialized
+	    (Debian #426364).
+
+	<li>improve CF_IMAKE_CFLAGS to work with Solaris sed (report by Peter
+	    Bray).
+
+	<li>improve guess for X's manpage section in <code>minstall.sh</code>,
+	    (prompted by comment by Miroslav Lichvar).
+
+	<li>modify <code>minstall.sh</code> to handle manpage patch with more
+	    than one dot (patch by Miroslav Lichvar).
+
+	<li>fix configure message for --disable-setgid option (patch by
+	    Miroslav Lichvar).
+
+	<li>add <code>allowTitleOps</code> resource to allow users to prevent
+	    the title- and icon-names from changing (request by John Bashinski).
+
+	<li>fix "spawn-new-terminal" action, for the case where no parameter
+	    is passed to the action (patch by Daniel Colascione).
+
+	<li>fix error-checking on internal font switching for "Selection"
+	    menu entry (Debian #421523).
+
+	<li>amend select/paste change from
+	    <a href="#xterm_225">patch #225</a>
+	    by limiting it to non-UTF-8/non-KOI8-R encoding (Debian #420974).
+
+	<li>add workaround for groff ".URL" codes which are not present in
+	    some commonly-used bitmap fonts (Debian #418324).
+</ul>
+
 <H1><A NAME="xterm_225">Patch #225 - 2007/3/24</A></H1>
 <ul>
 	<li>add <code>useClipping</code> resource to allow clipping to be
@@ -314,7 +433,7 @@ is the latest version of this file.
 	<li>add "spawn-new-terminal" action, which can be assigned to key
 	    translation, allowing one to spawn a new copy of xterm using
 	    the current process' working directory (adapted from patch
-	    by Daniel Colascio).
+	    by Daniel Colascione).
 
 	<li>improve select/paste between UTF-8 and Latin1 xterms by adapting
 	    the translations from <a href="#xterm_185">patch #185</a>.
@@ -1337,7 +1456,8 @@ is the latest version of this file.
 	<li>rename <code>$CMD</code> variable in <code>plink.sh</code> because
 	    it is a reserved symbol in bash 3.00.16 (report by Ted Taylor).
 
-	<li>add environment variables $XTERM_SHELL and $XTERM_VERSION
+	<li>add environment variables <code>$XTERM_SHELL</code> and
+	    <code>$XTERM_VERSION</code>
 	    (request by Zdenek Sekera).
 
 	<li>corrected workaround for background color of menubar, which gave

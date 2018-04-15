@@ -1,4 +1,4 @@
-/* $XTermId: menu.c,v 1.232 2007/03/18 23:05:54 tom Exp $ */
+/* $XTermId: menu.c,v 1.235 2007/06/17 10:24:52 tom Exp $ */
 
 /*
 
@@ -657,7 +657,7 @@ domenu(Widget w,
 	    update_selectToClipboard();
 	    update_visualbell();
 	    update_poponbell();
-	    update_marginbell();
+	    update_bellIsUrgent();
 	    update_cursorblink();
 	    update_altscreen();
 	    update_titeInhibit();
@@ -728,12 +728,13 @@ domenu(Widget w,
 
 #if OPT_TEK4014
     case tekMenu:
-	if (created) {
+	if (created && tekWidget) {
 	    set_tekfont_menu_item(tekWidget->screen.cur.fontsize, True);
 	    update_vtshow();
 	}
 	break;
 #endif
+    case noMenu:
     default:
 	break;
     }

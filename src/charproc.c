@@ -1,4 +1,4 @@
-/* $XTermId: charproc.c,v 1.784 2007/03/20 23:59:25 tom Exp $ */
+/* $XTermId: charproc.c,v 1.797 2007/06/17 12:52:35 tom Exp $ */
 
 /* $XFree86: xc/programs/xterm/charproc.c,v 3.185 2006/06/20 00:42:38 dickey Exp $ */
 
@@ -116,6 +116,14 @@ in this Software without prior written authorization from The Open Group.
 #include <X11/Xlocale.h>
 #endif
 
+#if HAVE_X11_SUNKEYSYM_H
+#include <X11/Sunkeysym.h>
+#endif
+
+#if HAVE_X11_XF86KEYSYM_H
+#include <X11/XF86keysym.h>
+#endif
+
 #include <stdio.h>
 #include <ctype.h>
 
@@ -220,6 +228,18 @@ static char defaultTranslations[] =
          Shift <KeyPress> Select:select-cursor-start() select-cursor-end(SELECT, CUT_BUFFER0) \n\
          Shift <KeyPress> Insert:insert-selection(SELECT, CUT_BUFFER0) \n\
 "
+#if OPT_EXTRA_PASTE
+#ifdef XF86XK_Paste
+"\
+            <KeyPress> XF86Paste:insert-selection(SELECT, CUT_BUFFER0) \n\
+"
+#endif
+#ifdef SunXK_Paste
+"\
+             <KeyPress> SunPaste:insert-selection(SELECT, CUT_BUFFER0) \n\
+"
+#endif
+#endif				/* OPT_EXTRA_PASTE */
 #if OPT_SHIFT_FONTS
 "\
     Shift~Ctrl <KeyPress> KP_Add:larger-vt-font() \n\
@@ -399,6 +419,7 @@ static XtActionsRec actionsList[] = {
 static XtResource resources[] =
 {
     Bres(XtNallowSendEvents, XtCAllowSendEvents, screen.allowSendEvent0, False),
+    Bres(XtNallowTitleOps, XtCAllowTitleOps, screen.allowTitleOp0, True),
     Bres(XtNallowWindowOps, XtCAllowWindowOps, screen.allowWindowOp0, True),
     Bres(XtNaltIsNotMeta, XtCAltIsNotMeta, screen.alt_is_not_meta, False),
     Bres(XtNaltSendsEscape, XtCAltSendsEscape, screen.alt_sends_esc, False),
@@ -550,6 +571,7 @@ static XtResource resources[] =
 #if OPT_HIGHLIGHT_COLOR
     Tres(XtNhighlightColor, XtCHighlightColor, HIGHLIGHT_BG, XtDefaultForeground),
     Tres(XtNhighlightTextColor, XtCHighlightTextColor, HIGHLIGHT_FG, XtDefaultBackground),
+    Bres(XtNhighlightReverse, XtCHighlightReverse, screen.hilite_reverse, True),
 #endif				/* OPT_HIGHLIGHT_COLOR */
 
 #if OPT_INPUT_METHOD
@@ -656,6 +678,8 @@ static XtResource resources[] =
     Bres(XtNvt100Graphics, XtCVT100Graphics, screen.vt100_graphics, True),
     Bres(XtNwideChars, XtCWideChars, screen.wide_chars, False),
     Ires(XtNcombiningChars, XtCCombiningChars, screen.max_combining, 2),
+    Ires(XtNmkSamplePass, XtCMkSamplePass, misc.mk_samplepass, 256),
+    Ires(XtNmkSampleSize, XtCMkSampleSize, misc.mk_samplesize, 1024),
     Ires(XtNutf8, XtCUtf8, screen.utf8_mode, uDefault),
     Sres(XtNwideBoldFont, XtCWideBoldFont, misc.default_font.f_wb, DEFWIDEBOLDFONT),
     Sres(XtNwideFont, XtCWideFont, misc.default_font.f_w, DEFWIDEFONT),
@@ -1214,7 +1238,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 	    }
 #endif
 
-	    /* substitute combined character with precomposed character 
+	    /* substitute combined character with precomposed character
 	     * only if it does not change the width of the base character
 	     */
 	    if (precomposed != -1 && my_wcwidth(precomposed) == my_wcwidth(prev)) {
@@ -3266,13 +3290,8 @@ in_put(XtermWidget xw)
 #endif
 #if OPT_SESSION_MGT
 	} else if (resource.sessionMgt) {
-	    /*
-	     * When session management is enabled, we should not block since
-	     * session related events can arrive any time.
-	     */
-	    select_timeout.tv_sec = 1;
-	    select_timeout.tv_usec = 0;
-	    time_select = 1;
+	    if (ice_fd >= 0)
+		FD_SET(ice_fd, &select_mask);
 #endif
 	}
 	if (need_cleanup)
@@ -3409,6 +3428,8 @@ dotext(XtermWidget xw,
 	}
 
 	if (width_here > width_available) {
+	    if (last_chomp > MaxCols(screen))
+		break;		/* give up - it is too big */
 	    chars_chomped--;
 	    width_here -= last_chomp;
 	    if (chars_chomped > 0 || (xw->flags & WRAPAROUND))
@@ -3438,8 +3459,9 @@ dotext(XtermWidget xw,
 		lobyte = (Char *) XtRealloc((char *) lobyte, limit);
 		hibyte = (Char *) XtRealloc((char *) hibyte, limit);
 	    }
-	    for (j = offset; j < offset + chars_chomped; j++) {
-		k = j - offset;
+	    for (j = offset, k = 0; j < offset + chars_chomped; j++) {
+		if (buf[j] == HIDDEN_CHAR)
+		    continue;
 		lobyte[k] = buf[j];
 		if (buf[j] > 255) {
 		    hibyte[k] = (buf[j] >> 8);
@@ -3447,11 +3469,12 @@ dotext(XtermWidget xw,
 		} else {
 		    hibyte[k] = 0;
 		}
+		++k;
 	    }
 
 	    WriteText(xw, PAIRED_CHARS(lobyte,
 				       (both ? hibyte : 0)),
-		      chars_chomped);
+		      k);
 #ifdef NO_LEAKS
 	    if (limit != 0) {
 		limit = 0;
@@ -5569,10 +5592,12 @@ VTInitialize(Widget wrequest,
     init_Bres(screen.meta_sends_esc);
 
     init_Bres(screen.allowSendEvent0);
+    init_Bres(screen.allowTitleOp0);
     init_Bres(screen.allowWindowOp0);
 
     /* make a copy so that editres cannot change the resource after startup */
     wnew->screen.allowSendEvents = wnew->screen.allowSendEvent0;
+    wnew->screen.allowTitleOps = wnew->screen.allowTitleOp0;
     wnew->screen.allowWindowOps = wnew->screen.allowWindowOp0;
 
 #ifndef NO_ACTIVE_ICON
@@ -5751,6 +5776,7 @@ VTInitialize(Widget wrequest,
 #if OPT_HIGHLIGHT_COLOR
     init_Tres(HIGHLIGHT_BG);
     init_Tres(HIGHLIGHT_FG);
+    init_Bres(screen.hilite_reverse);
 #endif
 
 #if OPT_TEK4014
@@ -5809,6 +5835,19 @@ VTInitialize(Widget wrequest,
     init_Bres(misc.mk_width);
     init_Bres(misc.cjk_width);
 
+    init_Ires(misc.mk_samplesize);
+    init_Ires(misc.mk_samplepass);
+
+    if (wnew->misc.mk_samplesize > 0xffff)
+	wnew->misc.mk_samplesize = 0xffff;
+    if (wnew->misc.mk_samplesize < 0)
+	wnew->misc.mk_samplesize = 0;
+
+    if (wnew->misc.mk_samplepass > wnew->misc.mk_samplesize)
+	wnew->misc.mk_samplepass = wnew->misc.mk_samplesize;
+    if (wnew->misc.mk_samplepass < 0)
+	wnew->misc.mk_samplepass = 0;
+
     if (request->screen.utf8_mode) {
 	TRACE(("setting wide_chars on\n"));
 	wnew->screen.wide_chars = True;
@@ -5834,7 +5873,9 @@ VTInitialize(Widget wrequest,
 
     decode_wcwidth((wnew->misc.cjk_width ? 2 : 0)
 		   + (wnew->misc.mk_width ? 1 : 0)
-		   + 1);
+		   + 1,
+		   wnew->misc.mk_samplesize,
+		   wnew->misc.mk_samplepass);
 #endif /* OPT_WIDE_CHARS */
 
     init_Bres(screen.always_bold_mode);
@@ -6018,6 +6059,7 @@ VTDestroy(Widget w GCC_UNUSED)
 #endif
 
     xtermCloseFonts(xw, screen->fnts);
+    noleaks_cachedCgs(xw);
 
 #if 0				/* some strings may be owned by X libraries */
     for (n = 0; n <= fontMenu_lastBuiltin; ++n) {
@@ -6710,6 +6752,8 @@ ShowCursor(void)
 #if OPT_HIGHLIGHT_COLOR
     Pixel selbg_pix = T_COLOR(screen, HIGHLIGHT_BG);
     Pixel selfg_pix = T_COLOR(screen, HIGHLIGHT_FG);
+    Boolean use_selbg;
+    Boolean use_selfg;
 #endif
 #if OPT_WIDE_CHARS
     Char chi = 0;
@@ -6811,6 +6855,10 @@ ShowCursor(void)
      * outline for the cursor.
      */
     filled = (screen->select || screen->always_highlight);
+#if OPT_HIGHLIGHT_COLOR
+    use_selbg = isNotForeground(xw, fg_pix, bg_pix, selbg_pix);
+    use_selfg = isNotBackground(xw, fg_pix, bg_pix, selfg_pix);
+#endif
     if (filled) {
 	if (reversed) {		/* text is reverse video */
 	    if (getCgsGC(xw, currentWin, gcVTcursNormal)) {
@@ -6822,18 +6870,19 @@ ShowCursor(void)
 		    setGC(gcNorm);
 		}
 	    }
+	    EXCHANGE(fg_pix, bg_pix, tmp);
 #if OPT_HIGHLIGHT_COLOR
-	    {
-		Bool use_selbg = isNotForeground(xw, fg_pix, bg_pix, selbg_pix);
-		Bool use_selfg = isNotBackground(xw, fg_pix, bg_pix, selfg_pix);
-
+	    if (screen->hilite_reverse) {
+		if (use_selbg && !use_selfg)
+		    fg_pix = bg_pix;
+		if (use_selfg && !use_selbg)
+		    bg_pix = fg_pix;
 		if (use_selbg)
-		    fg_pix = selbg_pix;
+		    bg_pix = selbg_pix;
 		if (use_selfg)
-		    bg_pix = selfg_pix;
+		    fg_pix = selfg_pix;
 	    }
 #endif
-	    EXCHANGE(fg_pix, bg_pix, tmp);
 	} else {		/* normal video */
 	    if (getCgsGC(xw, currentWin, gcVTcursReverse)) {
 		setGC(gcVTcursReverse);
@@ -6851,25 +6900,43 @@ ShowCursor(void)
 	setCgsFore(xw, currentWin, currentCgs, bg_pix);
     } else {			/* not selected */
 	if (reversed) {		/* text is reverse video */
-#if OPT_HIGHLIGHT_COLOR
-	    {
-		Bool use_selbg = isNotForeground(xw, fg_pix, bg_pix, selbg_pix);
-		Bool use_selfg = isNotBackground(xw, fg_pix, bg_pix, selfg_pix);
-
-		if (use_selbg)
-		    fg_pix = selbg_pix;
-		if (use_selfg)
-		    bg_pix = selfg_pix;
-	    }
-#endif
+	    EXCHANGE(fg_pix, bg_pix, tmp);
 	    setGC(gcNormReverse);
-	    setCgsFore(xw, currentWin, currentCgs, bg_pix);
-	    setCgsBack(xw, currentWin, currentCgs, fg_pix);
 	} else {		/* normal video */
 	    setGC(gcNorm);
-	    setCgsFore(xw, currentWin, currentCgs, fg_pix);
-	    setCgsBack(xw, currentWin, currentCgs, bg_pix);
 	}
+#if OPT_HIGHLIGHT_COLOR
+	if (screen->hilite_reverse) {
+	    if (in_selection && !reversed) {
+		;		/* really INVERSE ... */
+	    } else if (in_selection || reversed) {
+		if (use_selbg) {
+		    if (use_selfg) {
+			bg_pix = fg_pix;
+		    } else {
+			fg_pix = bg_pix;
+		    }
+		}
+		if (use_selbg) {
+		    bg_pix = selbg_pix;
+		}
+		if (use_selfg) {
+		    fg_pix = selfg_pix;
+		}
+	    }
+	} else {
+	    if (in_selection) {
+		if (use_selbg) {
+		    bg_pix = selbg_pix;
+		}
+		if (use_selfg) {
+		    fg_pix = selfg_pix;
+		}
+	    }
+	}
+#endif
+	setCgsFore(xw, currentWin, currentCgs, fg_pix);
+	setCgsBack(xw, currentWin, currentCgs, bg_pix);
     }
 
     if (screen->cursor_busy == 0
@@ -7483,17 +7550,20 @@ DoSetSelectedFont(Widget w,
     if (!IsXtermWidget(w) || *type != XA_STRING || *format != 8) {
 	Bell(XkbBI_MinorError, 0);
     } else {
+	Boolean failed = False;
 	XtermWidget xw = (XtermWidget) w;
+	int oldFont = xw->screen.menu_font_number;
 	char *save = xw->screen.MenuFontName(fontMenu_fontsel);
-	char *val = (char *) value;
+	char *val;
 	char *test = 0;
 	char *used = 0;
-	int len = strlen(val);
+	unsigned len = strlen((char *) value);
 
-	if (len > (int) *length) {
-	    len = (int) *length;
+	if (len > (unsigned) *length) {
+	    len = (unsigned) *length;
 	}
-	if (len > 0) {
+	if (len > 0 && (val = malloc(len + 1)) != 0) {
+	    memcpy(val, value, len);
 	    val[len] = '\0';
 	    used = x_strtrim(val);
 	    TRACE(("DoSetSelectedFont(%s)\n", val));
@@ -7509,17 +7579,25 @@ DoSetSelectedFont(Widget w,
 				   xtermFontName(val),
 				   True,
 				   fontMenu_fontsel)) {
-		    Bell(XkbBI_MinorError, 0);
+		    failed = True;
 		    free(test);
 		    xw->screen.MenuFontName(fontMenu_fontsel) = save;
 		} else {
 		    free(save);
 		}
 	    } else {
+		failed = True;
+	    }
+	    if (failed) {
+		(void) xtermLoadFont(term,
+				     xtermFontName(xw->screen.MenuFontName(oldFont)),
+				     True,
+				     oldFont);
 		Bell(XkbBI_MinorError, 0);
 	    }
 	    if (used != val)
 		free(used);
+	    free(val);
 	}
     }
 }

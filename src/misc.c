@@ -1,4 +1,4 @@
-/* $XTermId: misc.c,v 1.359 2007/03/21 22:13:32 tom Exp $ */
+/* $XTermId: misc.c,v 1.368 2007/06/17 12:47:54 tom Exp $ */
 
 /* $XFree86: xc/programs/xterm/misc.c,v 3.107 2006/06/19 00:36:51 dickey Exp $ */
 
@@ -67,6 +67,7 @@
 
 #include <X11/Xatom.h>
 #include <X11/cursorfont.h>
+#include <X11/Xlocale.h>
 
 #include <X11/Xmu/Error.h>
 #include <X11/Xmu/SysUtil.h>
@@ -125,7 +126,7 @@ static char *
 Readlink(const char *filename)
 {
     char *buf = NULL;
-    int size = 100;
+    unsigned size = 100;
     int n;
 
     for (;;) {
@@ -138,7 +139,7 @@ Readlink(const char *filename)
 	    return NULL;
 	}
 
-	if (n < size) {
+	if ((unsigned) n < size) {
 	    return buf;
 	}
 
@@ -497,22 +498,18 @@ HandleSpawnTerminal(Widget w GCC_UNUSED,
 	    || setgid(screen->gid) == -1) {
 	    fprintf(stderr, "Cannot reset uid/gid\n");
 	} else {
-	    if (nparams != 0) {
-		int myargc = *nparams + 1;
-		char **myargv = TypeMallocN(char *, myargc + 1);
-		if (myargv != 0) {
-		    int n = 0;
-		    myargv[n++] = child_exe;
-		    while (n <= myargc) {
-			myargv[n] = params[n - 1];
-			++n;
-		    }
-		    myargv[n] = 0;
-		    execv(child_exe, myargv);
-		}
-	    } else {
-		execl(child_exe, child_exe, NULL);
+	    int myargc = *nparams + 1;
+	    char **myargv = TypeMallocN(char *, myargc + 1);
+	    int n = 0;
+
+	    myargv[n++] = child_exe;
+
+	    while (n < myargc) {
+		myargv[n++] = *params++;
 	    }
+
+	    myargv[n] = 0;
+	    execv(child_exe, myargv);
 
 	    /* If we get here, we've failed */
 	    fprintf(stderr, "exec of '%s': %s\n", child_exe, SysErrorMsg(errno));
@@ -1435,7 +1432,7 @@ StartLog(TScreen * screen)
 	    close(ConnectionNumber(screen->display));
 	    close(screen->respond);
 
-	    if ((((cp = getenv("SHELL")) == NULL || *cp == 0)
+	    if ((((cp = x_getenv("SHELL")) == NULL)
 		 && ((pw = getpwuid(screen->uid)) == NULL
 		     || *(cp = pw->pw_shell) == 0))
 		|| (shell = CastMallocN(char, strlen(cp))) == 0) {
@@ -1874,13 +1871,11 @@ xtermIsPrintable(TScreen * screen, Char ** bufp, Char * last)
 #if OPT_WIDE_CHARS
     if (xtermEnvUTF8() && screen->utf8_title) {
 	PtyData data;
-	Boolean controls = True;
 
 	if (decodeUtf8(fakePtyData(&data, cp, last))) {
 	    if (data.utf_data != UCS_REPL
 		&& (data.utf_data >= 128 ||
 		    ansi_table[data.utf_data] == CASE_PRINT)) {
-		controls = False;
 		next += (data.utf_size - 1);
 		result = True;
 	    } else {
@@ -2140,7 +2135,7 @@ do_osc(XtermWidget xw, Char * oscbuf, unsigned len GCC_UNUSED, int final)
 {
     TScreen *screen = &(xw->screen);
     int mode;
-    Char *cp, *c2;
+    Char *cp;
     int state = 0;
     char *buf = 0;
 
@@ -2178,7 +2173,6 @@ do_osc(XtermWidget xw, Char * oscbuf, unsigned len GCC_UNUSED, int final)
 	    state = 3;
 	    /* FALLTHRU */
 	default:
-	    c2 = cp;
 	    if (!xtermIsPrintable(screen, &cp, oscbuf + len)) {
 		switch (mode) {
 		case 0:
@@ -2792,7 +2786,8 @@ ChangeGroup(String attribute, char *value)
 
     TRACE(("ChangeGroup(attribute=%s, value=%s)\n", attribute, name));
 
-    (void) screen;
+    if (!screen->allowTitleOps)
+	return;
 
     /*
      * Ignore titles that are too long to be plausible requests.
@@ -2803,7 +2798,7 @@ ChangeGroup(String attribute, char *value)
     for (cp = c1; *cp != 0; ++cp) {
 	Char *c2 = cp;
 	if (!xtermIsPrintable(screen, &cp, c1 + limit)) {
-	    memset(c2, '?', cp + 1 - c2);
+	    memset(c2, '?', (unsigned) (cp + 1 - c2));
 	}
     }
 
@@ -3160,7 +3155,7 @@ xtermFindShell(char *leaf, Bool warning)
     TRACE(("xtermFindShell(%s)\n", leaf));
     if (*result != '\0' && strchr("+/-", *result) == 0) {
 	/* find it in $PATH */
-	if ((s = getenv("PATH")) != 0) {
+	if ((s = x_getenv("PATH")) != 0) {
 	    if ((tmp = TypeMallocN(char, strlen(leaf) + strlen(s) + 1)) != 0) {
 		Bool found = False;
 		while (*s != '\0') {
@@ -3203,6 +3198,26 @@ xtermFindShell(char *leaf, Bool warning)
 }
 #endif /* VMS */
 
+#define ENV_HUNK(n)	((((n) + 1) | 31) + 1)
+
+/*
+ * copy the environment before Setenv'ing.
+ */
+void
+xtermCopyEnv(char **oldenv)
+{
+    unsigned size;
+    char **newenv;
+
+    for (size = 0; oldenv[size] != NULL; size++) {
+	;
+    }
+
+    newenv = TypeCallocN(char *, ENV_HUNK(size));
+    memmove(newenv, oldenv, size * sizeof(char *));
+    environ = newenv;
+}
+
 /*
  * sets the value of var to be arg in the Unix 4.2 BSD environment env.
  * Var should end with '=' (bindings are of the form "var=value").
@@ -3214,28 +3229,48 @@ void
 xtermSetenv(char *var, char *value)
 {
     if (value != 0) {
+	char *test;
 	int envindex = 0;
 	size_t len = strlen(var);
+	int found = -1;
 
-	TRACE(("xtermSetenv(var=%s, value=%s)\n", var, value));
+	TRACE(("xtermSetenv(%s=%s)\n", var, value));
 
-	while (environ[envindex] != NULL) {
-	    if (strncmp(environ[envindex], var, len) == 0) {
-		/* found it */
-		environ[envindex] = CastMallocN(char, len + strlen(value));
-		strcpy(environ[envindex], var);
-		strcat(environ[envindex], value);
-		return;
+	while ((test = environ[envindex]) != NULL) {
+	    if (strncmp(test, var, len) == 0 && test[len] == '=') {
+		found = envindex;
+		break;
 	    }
 	    envindex++;
 	}
 
-	TRACE(("...expanding env to %d\n", envindex + 1));
+	if (found < 0) {
+	    unsigned need = ENV_HUNK(envindex + 1);
+	    unsigned have = ENV_HUNK(envindex);
 
-	environ[envindex] = CastMallocN(char, len + strlen(value));
-	(void) strcpy(environ[envindex], var);
-	strcat(environ[envindex], value);
-	environ[++envindex] = NULL;
+	    if (need > have) {
+		char **newenv;
+		newenv = TypeMallocN(char *, need);
+		if (newenv == 0) {
+		    fprintf(stderr, "Cannot increase environment\n");
+		    return;
+		}
+		memmove(newenv, environ, have * sizeof(*newenv));
+		free(environ);
+		environ = newenv;
+	    }
+
+	    found = envindex;
+	    environ[found + 1] = NULL;
+	    environ = environ;
+	}
+
+	environ[found] = CastMallocN(char, 1 + len + strlen(value));
+	if (environ[found] == 0) {
+	    fprintf(stderr, "Cannot allocate environment %s\n", var);
+	    return;
+	}
+	sprintf(environ[found], "%s=%s", var, value);
     }
 }
 
@@ -3274,7 +3309,7 @@ xt_error(String message)
     /*
      * Check for the obvious - Xt does a poor job of reporting this.
      */
-    if ((ptr = getenv("DISPLAY")) == 0 || *x_strtrim(ptr) == '\0') {
+    if ((ptr = x_getenv("DISPLAY")) == 0) {
 	fprintf(stderr, "%s:  DISPLAY is not set\n", ProgramName);
     }
     exit(1);
@@ -3577,7 +3612,7 @@ sortedOpts(OptionHelp * options, XrmOptionDescRec * descs, Cardinal numDescs)
 }
 
 /*
- * Report the locale that xterm was started in.
+ * Report the character-type locale that xterm was started in.
  */
 char *
 xtermEnvLocale(void)
@@ -3585,10 +3620,9 @@ xtermEnvLocale(void)
     static char *result;
 
     if (result == 0) {
-	if ((result = getenv("LC_ALL")) == 0 || *result == '\0')
-	    if ((result = getenv("LC_CTYPE")) == 0 || *result == '\0')
-		if ((result = getenv("LANG")) == 0 || *result == '\0')
-		    result = "";
+	if ((result = x_nonempty(setlocale(LC_CTYPE, 0))) == 0) {
+	    result = "C";
+	}
 	TRACE(("xtermEnvLocale ->%s\n", result));
     }
     return result;
@@ -3604,7 +3638,7 @@ xtermEnvEncoding(void)
 	result = nl_langinfo(CODESET);
 #else
 	char *locale = xtermEnvLocale();
-	if (*locale == 0 || !strcmp(locale, "C") || !strcmp(locale, "POSIX")) {
+	if (!strcmp(locale, "C") || !strcmp(locale, "POSIX")) {
 	    result = "ASCII";
 	} else {
 	    result = "ISO-8859-1";
