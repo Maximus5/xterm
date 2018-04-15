@@ -1,5 +1,5 @@
 '\" t
-.\" $XTermId: xterm.man,v 1.460 2010/05/26 10:57:24 tom Exp $
+.\" $XTermId: xterm.man,v 1.465 2010/06/15 09:38:48 tom Exp $
 .\"
 .\" Copyright 1996-2009,2010 by Thomas E. Dickey
 .\"
@@ -1791,6 +1791,56 @@ provides a work-around for some ISDN routers which start an application
 control string without completing it.
 Set this to \*(``true\*('' if \fIxterm\fP appears to freeze when connecting.
 The default is \*(``false.\*(''
+.IP
+\fIXterm\fP's state parser recognizes
+several types of control strings which can contain text, e.g.,
+.sp
+.RS
+\fBAPC\fP (Application Program Command),
+.br
+\fBDCS\fP (Device Control String),
+.br
+\fBOSC\fP (Operating System Command),
+.br
+\fBPM\fP (Privacy Message), and
+.br
+\fBSOS\fP (Start of String),
+.RE
+.IP
+Each should end with a string-terminator (a special character which
+cannot appear in these strings).
+Ordinary control characters found within the string are not ignored;
+they are processed without interfering with the process of accumulating
+the control string's content.
+\fIXterm\fP recognizes these controls in all modes,
+although some of the functions may be suppressed after parsing the control.
+.IP
+When enabled, this feature allows the user to exit from an unterminated
+control string when any of these ordinary control characters are found:
+.sp
+.RS
+control/D (used as an end of file in many shells),
+.br
+control/H (backspace),
+.br
+control/I (tab-feed),
+.br
+control/J (line feed aka newline),
+.br
+control/K (vertical tab),
+.br
+control/L (form feed),
+.br
+control/M (carriage return),
+.br
+control/N (shift-out),
+.br
+control/O (shift-in),
+.br
+control/Q (XOFF),
+.br
+control/X (cancel)
+.RE
 .TP 8
 .B "c132 (\fPclass\fB C132)"
 Specifies whether or not the VT102 DECCOLM escape sequence,
@@ -2251,7 +2301,8 @@ The default is an empty string, which does not override anything.
 .B "faceName (\fPclass\fB FaceName)"
 Specify the pattern for fonts selected from the FreeType
 library if support for that library was compiled into \fIxterm\fR.
-There is no default.
+There is no default value.
+.IP
 If not specified,
 or if there is no match for both normal and bold fonts,
 \fIxterm\fR uses the \fBfont\fP and related resources.
@@ -2259,15 +2310,25 @@ or if there is no match for both normal and bold fonts,
 .B "faceNameDoublesize (\fPclass\fB FaceNameDoublesize)"
 Specify an double-width font for cases where an application requires
 this, e.g., in CJK applications.
-There is no default.
+There is no default value.
+.IP
 If the application uses double-wide characters and this resource is not given,
-\fIxterm\fP  will use a scaled version of the font given by \fBfaceName\fP.
+\fIxterm\fP will use a scaled version of the font given by \fBfaceName\fP.
 .TP 8
 .B "faceSize (\fPclass\fB FaceSize)"
 Specify the pointsize for fonts selected from the FreeType
 library if support for that library was compiled into \fIxterm\fR.
 The default is \*(``14.\*(''
 On the \fBVT\ Fonts\fP menu, this corresponds to the \fIDefault\fP entry.
+.IP
+Although the default is \*(``14.\*('',
+this may not be the same as the pointsize for the default bitmap font,
+i.e., that assigned with the \fB\-fn\fP option,
+or the \fBfont\fP resource.
+For example, the "fixed" font usually has a pointsize of \*(``8.\*(''.
+If you set \fBfaceSize\fP to match the size of the bitmap font,
+then switching between bitmap and TrueType fonts via the font menu
+will give comparable sizes for the window.
 .IP
 You can specify the pointsize for TrueType fonts selected with the other
 size-related menu entries such as Medium, Huge, etc., by using one of
@@ -2994,7 +3055,37 @@ The default is \*(``false.\*(''
 .B "renderFont (\fPclass\fB RenderFont)"
 If \fIxterm\fR is built with the Xft library,
 this controls whether the \fBfaceName\fR resource is used.
-The default is \*(``true.\*(''
+The default is \*(``default.\*(''
+.IP
+The resource values are strings, evaluated as booleans after startup.
+.RS
+.TP 5
+false
+.br
+disable the feature and use the normal (bitmap) font.
+.TP 5
+true
+.br
+startup using the TrueType font specified by the \fBfaceName\fP and
+\fBfaceSize\fP resource settings.
+If there is no value for \fBfaceName\fP, disable the feature and use
+the normal (bitmap) font.
+.IP
+After startup, you can still switch to/from the bitmap font using the
+\*(``TrueType Fonts\*('' menu entry.
+.TP 5
+default
+.br
+startup using the normal (bitmap) font,
+but enable the \*(``TrueType Fonts\*(''
+menu entry to allow runtime switching to/from TrueType fonts.
+.IP
+If there is no \fBfaceName\fP resource set,
+then runtime switching to TrueType fonts is disabled.
+\fIXterm\fP has a separate  compiled-in value for \fBfaceName\fP
+for the special case where \fBrenderFont\fP is \*(``default\*(''.
+That is normally \*(``mono\*(''.
+.RE
 .TP 8
 .B "resizeGravity (\fPclass\fB ResizeGravity)"
 Affects the behavior when the window is resized to be taller or
@@ -4820,6 +4911,12 @@ This action sends a SIGHUP to the subprogram and exits.
 It is also invoked
 by the \fBquit\fP entry in \fImainMenu\fP.
 .TP 8
+.B "readline-button()"
+Supports the optional readline feature by echoing repeated cursor forward
+or backward control sequences on button release event,
+to request that the host application update its notion of the cursor's
+position to match the button event.
+.TP 8
 .B "redraw()"
 This action redraws the window and is also invoked by the
 \fIredraw\fP entry in \fImainMenu\fP.
@@ -4850,6 +4947,11 @@ in the other direction.
 This action toggles the \fISecure Keyboard\fP mode described in the
 section named \fBSECURITY\fP, and is invoked from the \fBsecurekbd\fP
 entry in \fImainMenu\fP.
+.TP 8
+.B "scroll-lock(\fIon/off/toggle\fP)"
+This action toggles internal state which tells
+\fIxterm\fP whether Scroll Lock is active,
+subject to the \fBallowScrollLock\fP resource.
 .TP 8
 .B "select-cursor-end(\fIdestname\fP [, ...])"
 This action is similar to \fBselect-end\fP except that it should be used
@@ -4899,6 +5001,10 @@ as \fItstp\fP), \fIcont\fP
 (if supported by the operating system), \fIint\fP, \fIhup\fP, \fIterm\fP,
 \fIquit\fP,
 \fIalrm\fP, \fIalarm\fP (same as \fIalrm\fP) and \fIkill\fP.
+.TP 8
+.B "set-8-bit-control(\fIon/off/toggle\fP)"
+This action toggles the \fBeightBitControl\fP resource and is also invoked from the
+\fB8-bit-control\fP entry in \fIvtMenu\fP.
 .TP 8
 .B "set-allow132(\fIon/off/toggle\fP)"
 This action toggles the \fBc132\fP resource and is also invoked from the
@@ -4955,10 +5061,16 @@ This action toggles the \fBjumpscroll\fP resource and is also invoked by the
 This action toggles the \fIxterm\fR's state regarding whether the current font
 has line-drawing characters and whether it should draw them directly.
 It is also invoked by the \fBfont-linedrawing\fP entry in \fIfontMenu\fP.
+.\" .\" not implemented
+.\" .TP 8
+.\" .B "set-font-loading(\fIon/off/toggle\fP)"
+.\" This action toggles the TBD resource
+.\" which controls the ability to load VT220 soft fonts.
+.\" It is also invoked by the \fBfont-loadable\fP entry in \fIfontMenu\fP.
 .TP 8
 .B "set-font-packed(\fIon/off/toggle\fP)"
 This action toggles the \fIforcePackedFont\fR's resource
-which controls to use the font's minimum or maximum glyph width.
+which controls use of the font's minimum or maximum glyph width.
 It is also invoked by the \fBfont-packed\fP entry in \fIfontMenu\fP.
 .TP 8
 .B "set-keep-selection(\fIon/off/toggle\fP)"
@@ -5180,8 +5292,7 @@ which is set by the \fBselectToClipboard\fP resource:
          Shift <KeyPress> Select:select-cursor-start() \\\&
                                  select-cursor-end(SELECT, CUT_BUFFER0) \\n\\\&
          Shift <KeyPress> Insert:insert-selection(SELECT, CUT_BUFFER0) \\n\\\&
-            <KeyPress> XF86Paste:insert-selection(SELECT, CUT_BUFFER0) \\n\\\&
-             <KeyPress> SunPaste:insert-selection(SELECT, CUT_BUFFER0) \\n\\\&
+        <KeyRelease> Scroll_Lock:scroll-lock() \\n\\\&
     Shift~Ctrl <KeyPress> KP_Add:larger-vt-font() \\n\\\&
     Shift Ctrl <KeyPress> KP_Add:smaller-vt-font() \\n\\\&
     Shift <KeyPress> KP_Subtract:smaller-vt-font() \\n\\\&

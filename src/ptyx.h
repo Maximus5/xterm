@@ -1,4 +1,4 @@
-/* $XTermId: ptyx.h,v 1.668 2010/06/04 09:41:40 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.670 2010/06/15 08:34:38 tom Exp $ */
 
 /*
  * Copyright 1999-2009,2010 by Thomas E. Dickey
@@ -325,8 +325,16 @@ typedef struct {
 /*
  * ANSI emulation, special character codes
  */
+#define ANSI_EOT	0x04
 #define ANSI_BEL	0x07
+#define ANSI_BS		0x08
+#define ANSI_HT		0x09
+#define ANSI_LF		0x0A
+#define ANSI_VT		0x0B
 #define	ANSI_FF		0x0C		/* C0, C1 control names		*/
+#define ANSI_CR		0x0D
+#define ANSI_SO		0x0E
+#define ANSI_SI		0x0F
 #define	ANSI_XON	0x11		/* DC1 */
 #define	ANSI_XOFF	0x13		/* DC3 */
 #define	ANSI_NAK	0x15
@@ -1318,6 +1326,17 @@ typedef struct {
 } XTermFonts;
 
 #if OPT_RENDERFONT
+typedef enum {
+	erFalse = 0
+	, erTrue
+	, erDefault
+	, erLast
+} RenderFont;
+
+#define DefaultRenderFont(xw) \
+	if ((xw)->misc.render_font == erDefault) \
+	    (xw)->misc.render_font = erFalse
+
 typedef struct {
 	XftFont *	font;
 	FontMap		map;
@@ -2195,6 +2214,7 @@ typedef struct _Misc {
     char *face_name;
     char *face_wide_name;
     float face_size[NMENUFONTS];
+    char *render_font_s;
     Boolean render_font;
 #endif
 } Misc;
@@ -2424,7 +2444,7 @@ typedef struct _TekWidgetRec {
 /*
  * Macro to check if we are iconified; do not use render for that case.
  */
-#define UsingRenderFont(xw)	((xw)->misc.render_font && !IsIcon(TScreenOf(xw)))
+#define UsingRenderFont(xw)	(((xw)->misc.render_font == True) && !IsIcon(TScreenOf(xw)))
 
 /*
  * These definitions do not depend on whether xterm supports active-icon.

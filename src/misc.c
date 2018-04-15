@@ -1,4 +1,4 @@
-/* $XTermId: misc.c,v 1.499 2010/06/04 01:02:08 tom Exp $ */
+/* $XTermId: misc.c,v 1.503 2010/06/20 21:33:49 tom Exp $ */
 
 /*
  * Copyright 1999-2009,2010 by Thomas E. Dickey
@@ -567,7 +567,7 @@ HandleStringEvent(Widget w GCC_UNUSED,
 	    StringInput(term, hexval, (size_t) 1);
 	}
     } else {
-	StringInput(term, (Char *) * params, strlen(*params));
+	StringInput(term, (const Char *) *params, strlen(*params));
     }
 }
 
@@ -680,14 +680,14 @@ HandleInterpret(Widget w GCC_UNUSED,
 		Cardinal *param_count)
 {
     if (*param_count == 1) {
-	char *value = params[0];
+	const char *value = params[0];
 	int need = (int) strlen(value);
 	int used = (int) (VTbuffer->next - VTbuffer->buffer);
 	int have = (int) (VTbuffer->last - VTbuffer->buffer);
 
 	if (have - used + need < BUF_SIZE) {
 
-	    fillPtyData(TScreenOf(term), VTbuffer, value, (int) strlen(value));
+	    fillPtyData(term, VTbuffer, value, (int) strlen(value));
 
 	    TRACE(("Interpret %s\n", value));
 	    VTbuffer->update++;
@@ -776,7 +776,7 @@ HandleFocusChange(Widget w GCC_UNUSED,
 			    : FOCUS));
 	}
 	if (screen->grabbedKbd && (event->mode == NotifyUngrab)) {
-	    Bell(XkbBI_Info, 100);
+	    Bell(xw, XkbBI_Info, 100);
 	    ReverseVideo(xw);
 	    screen->grabbedKbd = False;
 	    update_securekbd();
@@ -862,9 +862,8 @@ xtermBell(XtermWidget xw, int which, int percent)
 }
 
 void
-Bell(int which, int percent)
+Bell(XtermWidget xw, int which, int percent)
 {
-    XtermWidget xw = term;
     TScreen *screen = TScreenOf(xw);
     struct timeval curtime;
     long now_msecs;
@@ -1179,7 +1178,7 @@ HandleDabbrevExpand(Widget w,
     if ((xw = getXtermWidget(w)) != 0) {
 	TScreen *screen = TScreenOf(xw);
 	if (!dabbrev_expand(screen))
-	    Bell(XkbBI_TerminalBell, 0);
+	    Bell(xw, XkbBI_TerminalBell, 0);
     }
 }
 #endif /* OPT_DABBREV */
@@ -1606,23 +1605,25 @@ xtermResetIds(TScreen * screen)
 static SIGNAL_T
 logpipe(int sig GCC_UNUSED)
 {
-    TScreen *screen = TScreenOf(term);
+    XtermWidget xw = term;
+    TScreen *screen = TScreenOf(xw);
 
 #ifdef SYSV
     (void) signal(SIGPIPE, SIG_IGN);
 #endif /* SYSV */
     if (screen->logging)
-	CloseLog(screen);
+	CloseLog(xw);
 }
 #endif /* ALLOWLOGFILEEXEC */
 
 void
-StartLog(TScreen * screen)
+StartLog(XtermWidget xw)
 {
     static char *log_default;
 #ifdef ALLOWLOGFILEEXEC
     char *cp;
 #endif /* ALLOWLOGFILEEXEC */
+    TScreen *screen = TScreenOf(xw);
 
     if (screen->logging || (screen->inhibit & I_LOG))
 	return;
@@ -1728,8 +1729,8 @@ StartLog(TScreen * screen)
 	screen->logfd = p[1];
 	signal(SIGPIPE, logpipe);
 #else
-	Bell(XkbBI_Info, 0);
-	Bell(XkbBI_Info, 0);
+	Bell(xw, XkbBI_Info, 0);
+	Bell(xw, XkbBI_Info, 0);
 	return;
 #endif
     } else {
@@ -1746,19 +1747,23 @@ StartLog(TScreen * screen)
 }
 
 void
-CloseLog(TScreen * screen)
+CloseLog(XtermWidget xw)
 {
+    TScreen *screen = TScreenOf(xw);
+
     if (!screen->logging || (screen->inhibit & I_LOG))
 	return;
-    FlushLog(screen);
+    FlushLog(xw);
     close(screen->logfd);
     screen->logging = False;
     update_logging();
 }
 
 void
-FlushLog(TScreen * screen)
+FlushLog(XtermWidget xw)
 {
+    TScreen *screen = TScreenOf(xw);
+
     if (screen->logging && !(screen->inhibit & I_LOG)) {
 	Char *cp;
 	int i;
@@ -1932,7 +1937,7 @@ find_closest_color(Display * dpy, Colormap cmap, XColor * def)
 static int
 AllocateAnsiColor(XtermWidget xw,
 		  ColorRes * res,
-		  char *spec)
+		  const char *spec)
 {
     int result;
     XColor def;
@@ -1999,7 +2004,7 @@ xtermGetColorRes(XtermWidget xw, ColorRes * res)
 #endif
 
 static int
-ChangeOneAnsiColor(XtermWidget xw, int color, char *name)
+ChangeOneAnsiColor(XtermWidget xw, int color, const char *name)
 {
     int code;
 
@@ -2505,7 +2510,7 @@ ResetColorsRequest(XtermWidget xw,
 		   int code)
 {
     Bool result = False;
-    char *thisName;
+    const char *thisName;
     ScrnColors newColors;
     int ndx;
 
@@ -2588,13 +2593,13 @@ QueryFontRequest(XtermWidget xw, char *buf, int final)
 	Bool success = True;
 	int num;
 	char *base = buf + 1;
-	char *name = 0;
+	const char *name = 0;
 	char temp[10];
 
 	num = ParseShiftedFont(xw, buf, &buf);
 	if (num < 0
 	    || num > fontMenu_lastBuiltin) {
-	    Bell(XkbBI_MinorError, 0);
+	    Bell(xw, XkbBI_MinorError, 0);
 	    success = False;
 	} else {
 #if OPT_RENDERFONT
@@ -2652,7 +2657,7 @@ ChangeFontRequest(XtermWidget xw, char *buf)
 
 	    if (num < 0
 		|| num > fontMenu_lastBuiltin) {
-		Bell(XkbBI_MinorError, 0);
+		Bell(xw, XkbBI_MinorError, 0);
 		success = False;
 	    } else {
 		/*
@@ -2699,7 +2704,7 @@ ChangeFontRequest(XtermWidget xw, char *buf)
 		SetVTFont(xw, num, True, &fonts);
 	    }
 	} else {
-	    Bell(XkbBI_MinorError, 0);
+	    Bell(xw, XkbBI_MinorError, 0);
 	}
 	free(name);
     }
@@ -2910,8 +2915,8 @@ do_osc(XtermWidget xw, Char * oscbuf, size_t len, int final)
 	    break;
 	}
 #endif
-	Bell(XkbBI_Info, 0);
-	Bell(XkbBI_Info, 0);
+	Bell(xw, XkbBI_Info, 0);
+	Bell(xw, XkbBI_Info, 0);
 	break;
 #endif /* ALLOWLOGGING */
 
@@ -4083,8 +4088,10 @@ set_tek_visibility(Bool on)
 void
 end_tek_mode(void)
 {
-    if (TEK4014_ACTIVE(term)) {
-	FlushLog(TScreenOf(term));
+    XtermWidget xw = term;
+
+    if (TEK4014_ACTIVE(xw)) {
+	FlushLog(xw);
 	longjmp(Tekend, 1);
     }
     return;
@@ -4093,9 +4100,11 @@ end_tek_mode(void)
 void
 end_vt_mode(void)
 {
-    if (!TEK4014_ACTIVE(term)) {
-	FlushLog(TScreenOf(term));
-	TEK4014_ACTIVE(term) = True;
+    XtermWidget xw = term;
+
+    if (!TEK4014_ACTIVE(xw)) {
+	FlushLog(xw);
+	TEK4014_ACTIVE(xw) = True;
 	longjmp(VTend, 1);
     }
     return;
@@ -4161,9 +4170,11 @@ sortedOptDescs(XrmOptionDescRec * descs, Cardinal res_count)
     static XrmOptionDescRec *res_array = 0;
 
 #ifdef NO_LEAKS
-    if (descs == 0 && res_array != 0) {
-	free(res_array);
-	res_array = 0;
+    if (descs == 0) {
+	if (res_array != 0) {
+	    free(res_array);
+	    res_array = 0;
+	}
     } else
 #endif
     if (res_array == 0) {
@@ -4227,9 +4238,9 @@ sortedOpts(OptionHelp * options, XrmOptionDescRec * descs, Cardinal numDescs)
 #if OPT_TRACE
 	for (j = 0; j < opt_count; j++) {
 	    if (!strncmp(opt_array[j].opt, "-/+", 3)) {
-		char *name = opt_array[j].opt + 3;
+		const char *name = opt_array[j].opt + 3;
 		for (k = 0; k < numDescs; ++k) {
-		    char *value = res_array[k].value;
+		    const char *value = res_array[k].value;
 		    if (res_array[k].option[0] == '-') {
 			code = -1;
 		    } else if (res_array[k].option[0] == '+') {
@@ -4352,9 +4363,11 @@ xtermEnvUTF8(void)
 char *
 xtermVersion(void)
 {
+    static char vendor_version[] = __vendorversion__;
     static char *result;
+
     if (result == 0) {
-	char *vendor = __vendorversion__;
+	char *vendor = vendor_version;
 	char first[BUFSIZ];
 	char second[BUFSIZ];
 
