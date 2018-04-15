@@ -1,9 +1,9 @@
 .\"#! troff -ms $1		-*- Nroff -*-
 .\" "Xterm Control Sequences" document
-.\" $XTermId: ctlseqs.ms,v 1.201 2009/12/07 09:59:49 tom Exp $
+.\" $XTermId: ctlseqs.ms,v 1.211 2010/01/04 09:12:55 tom Exp $
 .\"
 .\"
-.\" Copyright 1996-2008,2009 by Thomas E. Dickey
+.\" Copyright 1996-2009,2010 by Thomas E. Dickey
 .\"
 .\"                         All Rights Reserved
 .\"
@@ -288,7 +288,7 @@ X Consortium (1994)
 Thomas Dickey
 .AI
 XFree86 Project (1996-2006)
-invisible-island.net (2006-2009)
+invisible-island.net (2006-2010)
 .AU
 .
 .am BT                  \" add page numbers after first page
@@ -586,12 +586,24 @@ or
 \*(Dc\*0\*$\*r\*(Pt\*s\*(ST
 for invalid requests.
 .
+.IP \\*(Dc\\*+\\*p\\*(Pt\\*s\\*(ST
+Set Termcap/Terminfo Data (xterm, experimental).
+The string following the "p" is a name to use for retrieving data from 
+the terminal database.  The data will be used for the "tcap" keyboard
+configuration's function- and special-keys, as well as by the
+Request Termcap/Terminfo String control.
+
 .IP \\*(Dc\\*+\\*q\\*(Pt\\*s\\*(ST
 Request Termcap/Terminfo String (xterm, experimental).
 The string following the "q" is a list of names
 encoded in hexadecimal (2 digits per character)
 separated by \*;
 which correspond to termcap or terminfo key names.
+.br
+Two special features are also recognized, which are not key names:
+\fICo\fP for termcap colors (or \fIcolors\fP for terminfo colors),
+and
+\fITN\fP for termcap name (or \fIname\fP for terminfo name).
 .br
 \fIxterm\fP responds with
 \*(Dc\*1\*+\*r\*(Pt\*s\*(ST
@@ -1073,7 +1085,7 @@ Valid values for the second parameter:
   \*(Ps = \*1 \(-> 7-bit controls (always set for VT100)
   \*(Ps = \*2 \(-> 8-bit controls
 .
-.IP \\*(Cs\\*(Ps\\*s\\*(Sp"\\*q
+.IP \\*(Cs\\*(Ps\\*s\\*(Sp\\*q
 Set cursor style (DECSCUSR, VT520)
   \*(Ps = \*0 \(-> blinking block
   \*(Ps = \*1 \(-> blinking block (default)
@@ -1157,8 +1169,20 @@ Each parameter enables a single feature.
   \*(Ps = \*3 \(-> Query window/icon labels using UTF-8
 (See discussion of "Title Modes")
 .
+.IP \\*(Cs\\*(Ps\\*s\\*(Sp\\*t
+Set warning-bell volume (DECSWBV, VT520)
+  \*(Ps = \*0 or \*1 \(-> off
+  \*(Ps = \*2, \*3 or \*4 \(-> low
+  \*(Ps = \*5, \*6, \*7, or \*8 \(-> high
+.
 .IP \\*(Cs\\*u
 Restore cursor (ANSI.SYS)
+.
+.IP \\*(Cs\\*(Ps\\*s\\*(Sp\\*u
+Set margin-bell volume (DECSMBV, VT520)
+  \*(Ps = \*1 \(-> off
+  \*(Ps = \*2, \*3 or \*4 \(-> low
+  \*(Ps = \*0, \*5, \*6, \*7, or \*8 \(-> high
 .
 .IP \\*(Cs\\*(Pt\\*;\\*(Pl\\*;\\*(Pb\\*;\\*(Pr\\*;\\*(Pp\\*;\\*(Pt\\*;\\*(Pl\\*;\\*(Pp\\*$\\*v
 Copy Rectangular Area (DECCRA)
@@ -1326,12 +1350,14 @@ to these codes in an \*(Os\*4 control:
   \*(Pc = 2 \(-> resource \fBcolorBL\fP (BLINK)
   \*(Pc = 3 \(-> resource \fBcolorRV\fP (REVERSE)
 .sp
-The 8 colors (below) which may be set using \*1\*0 through \*1\*7 are
+The 8 colors (below) which may be set or queried
+using \*1\*0 through \*1\*7 are
 denoted \fIdynamic colors\fR, since the corresponding control sequences
 were the first means for setting \fBxterm\fR's colors dynamically,
 i.e., after it was started.
 They are not the same as the ANSI colors.
-One or more parameters is expected for \*(Pt.
+These controls may be disabled using the \fIallowColorOps\fP resource.
+At least one parameter is expected for \*(Pt.
 Each successive parameter changes the next color in the list.
 The value of \*(Ps tells the starting point in the list.
 The colors are specified by name or RGB specification as per \fIXParseColor\fP.
@@ -1356,10 +1382,20 @@ be given in one control sequence, \fBxterm\fR can make more than one reply.
 compile-time option)
 .sp
   \*(Ps = \*5\*0 \(-> Set Font to \*(Pt
+These controls may be disabled using the \fIallowFontOps\fP resource.
 If \*(Pt begins with a "#", index in the font menu, relative (if the
 next character is a plus or minus sign) or absolute.  A number is
 expected but not required after the sign (the default is the current
 entry for relative, zero for absolute indexing).
+.br
+The same rule (plus or minus sign, optional number) is used when
+querying the font.  The remainder of \*(Pt is ignored.
+.br
+A font can be specified after a "#" index expression,
+by adding a space and then the font specifier.
+.br
+If the "TrueType Fonts" menu entry is set (the \fBrenderFont\fP resource),
+then this control sets/queries the \fBfaceName\fP resource.
 .sp
   \*(Ps = \*5\*1 (reserved for Emacs shell)
 .sp

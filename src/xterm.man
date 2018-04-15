@@ -1,7 +1,7 @@
 '\" t
-.\" $XTermId: xterm.man,v 1.444 2009/12/07 09:21:05 tom Exp $
+.\" $XTermId: xterm.man,v 1.450 2010/01/04 22:58:41 tom Exp $
 .\"
-.\" Copyright 1996-2008,2009 by Thomas E. Dickey
+.\" Copyright 1996-2009,2010 by Thomas E. Dickey
 .\"
 .\"                         All Rights Reserved
 .\"
@@ -1492,6 +1492,11 @@ Although this corresponds to no particular standard,
 some users insist it is a VT100.
 The default is \*(``false.\*(''
 .TP
+.B "allowColorOps (\fPclass\fB AllowColorOps)"
+Specifies whether control sequences that set/query the dynamic colors should be allowed.
+ANSI colors are unaffected by this resource setting.
+The default is \*(``true.\*(''
+.TP
 .B "allowFontOps (\fPclass\fB AllowFontOps)"
 Specifies whether control sequences that set/query the font should be allowed.
 The default is \*(``true.\*(''
@@ -1997,6 +2002,67 @@ the same layout on the screen as the original text.
 Specifies whether the Delete key on the editing keypad should send DEL (127)
 or the VT220-style Remove escape sequence.
 The default is \*(``false,\*('' for the latter.
+.TP 8
+.B "disallowedColorOps (\fPclass\fB DisallowedColorOps)"
+Specify which features will be disabled if \fBallowColorOps\fP is false.
+This is a comma-separated list of names.
+The default value is
+.RS
+SetColor,GetColor,GetAnsiColor
+.RE
+.IP
+The names are listed below.  \fIxterm\fP ignores capitalization, but
+they are shown in mixed-case for clarity.
+.RS
+.TP 5
+SetColor
+Set a specific dynamic color.
+.TP 5
+GetColor
+Report the current setting of a given dynamic color.
+.TP 5
+GetAnsiColor
+Report the current setting of a given ANSI color (actually any of the colors
+set via ANSI-style controls).
+.RE
+.TP 8
+.B "disallowedFontOps (\fPclass\fB DisallowedFontOps)"
+Specify which features will be disabled if \fBallowFontOps\fP is false.
+This is a comma-separated list of names.
+The default value is
+.RS
+SetFont,GetFont
+.RE
+.IP
+The names are listed below.  \fIxterm\fP ignores capitalization, but
+they are shown in mixed-case for clarity.
+.RS
+.TP 5
+SetFont
+Set the specified font.
+.TP 5
+GetFont
+Report the specified font.
+.RE
+.TP 8
+.B "disallowedTcapOps (\fPclass\fB DisallowedTcapOps)"
+Specify which features will be disabled if \fBallowTcapOps\fP is false.
+This is a comma-separated list of names.
+The default value is
+.RS
+SetTcap,GetTcap
+.RE
+.IP
+The names are listed below.  \fIxterm\fP ignores capitalization, but
+they are shown in mixed-case for clarity.
+.RS
+.TP 5
+SetTcap
+(not implemented)
+.TP 5
+GetTcap
+Report specified function- and other special keys.
+.RE
 .TP 8
 .B "disallowedWindowOps (\fPclass\fB DisallowedWindowOps)"
 Specify which features will be disabled if \fBallowWindowOps\fP is false.
@@ -3032,6 +3098,30 @@ sequences (also known as private modes) 1047, 1048 and 1049 which have the same
 effect as the original 47 control sequence.
 The default for this resource is \*(``false.\*(''
 .TP 8
+.B "titleModes (\fPclass\fB TitleModes)"
+Tells \fIxterm\fP whether to accept or return
+window- and icon-labels in ISO-8859-1
+(the default) or UTF-8.
+Either can be encoded in hexadecimal.
+The default for this resource is \*(``0.\*(''
+.IP
+Each bit (bit "0" is 1, bit "1" is 2, etc) corresponds to one of the
+parameters set by the title modes control sequence:
+.RS
+.TP 5
+0
+Set window/icon labels using hexadecimal
+.TP 5
+1
+Query window/icon labels using hexadecimal
+.TP 5
+2
+Set window/icon labels using UTF-8 (overrides \fButf8Titles\fP resource).
+.TP 5
+3
+Query window/icon labels using UTF-8
+.RE
+.TP 8
 .B "translations (\fPclass\fB Translations)"
 Specifies the key and button bindings for menus, selections, \*(``programmed
 strings,\*('' etc.
@@ -3131,6 +3221,8 @@ This feature is available as a menu entry, since it is related to
 the particular applications you are running within \fIxterm\fP.
 You can also use a control sequence (see the discussion of "Title Modes"
 in the control sequences document), to set an equivalent flag.
+The \fBtitleModes\fP resource sets the same value,
+which overrides this resource.
 .IP
 The default is \*(``false.\*(''
 .TP 8
@@ -4207,6 +4299,10 @@ which can be controlled by writing escape sequences to the terminal.
 These are disabled if the SendEvents feature is enabled:
 .RS
 .TP
+Allow Color Ops (allow-font-ops)
+This corresponds to the \fBallowColorOps\fP resource.
+Enable or disable control sequences that set/query the colors.
+.TP
 Allow Font Ops (allow-font-ops)
 This corresponds to the \fBallowFontOps\fP resource.
 Enable or disable control sequences that set/query the font.
@@ -4449,6 +4545,10 @@ and will cause unpredictable behavior.
 The following
 actions are provided for use within the \fIvt100\fP or \fItek4014\fP
 \fBtranslations\fP resources:
+.TP 8
+.B "allow-color-ops(\fIon/off/toggle\fP)"
+This action set or toggles the \fBallowColorOps\fP resource and is also
+invoked by the \fBallow-color-ops\fP entry in \fIfontMenu\fP.
 .TP 8
 .B "allow-font-ops(\fIon/off/toggle\fP)"
 This action set or toggles the \fBallowFontOps\fP resource and is also

@@ -1,7 +1,7 @@
-/* $XTermId: ptyx.h,v 1.649 2009/12/06 18:21:13 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.656 2010/01/04 09:09:29 tom Exp $ */
 
 /*
- * Copyright 1999-2008,2009 by Thomas E. Dickey
+ * Copyright 1999-2009,2010 by Thomas E. Dickey
  *
  *                         All Rights Reserved
  *
@@ -306,6 +306,8 @@ typedef const Char *UString;
 #else
 typedef Char *UString;
 #endif
+
+#define IsEmpty(s) ((s) == 0 || *(s) == '\0')
 
 #define CharOf(n) ((unsigned char)(n))
 
@@ -854,6 +856,25 @@ typedef enum {
 } SelectUnit;
 
 typedef enum {
+    ecSetColor = 1
+    , ecGetColor
+    , ecGetAnsiColor
+    , ecLAST
+} ColorOps;
+
+typedef enum {
+    efSetFont = 1
+    , efGetFont
+    , efLAST
+} FontOps;
+
+typedef enum {
+    etSetTcap = 1
+    , etGetTcap
+    , etLAST
+} TcapOps;
+
+typedef enum {
     /* 1-21 are chosen to be the same as the control-sequence coding */
     ewRestoreWin = 1
     , ewMinimizeWin = 2
@@ -951,6 +972,8 @@ typedef enum {
 #if OPT_TCAP_QUERY && OPT_ISO_COLORS
 # define XK_COLORS 0x0003
 #endif
+
+# define XK_TCAPNAME 0x0004
 
 #else	/* !OPT_ISO_COLORS */
 
@@ -1355,6 +1378,12 @@ typedef enum {
 #endif
 } MenuIndex;
 
+typedef enum {
+	bvOff = -1,
+	bvLow = 0,
+	bvHigh
+} BellVolume;
+
 #define NUM_POPUP_MENUS 4
 
 #if OPT_COLOR_RES
@@ -1566,17 +1595,28 @@ typedef struct {
 	Boolean		visualbell;	/* visual bell mode		*/
 	Boolean		poponbell;	/* pop on bell mode		*/
 
+	Boolean		allowColorOps;	/* ColorOps mode		*/
 	Boolean		allowFontOps;	/* FontOps mode			*/
 	Boolean		allowSendEvents;/* SendEvent mode		*/
 	Boolean		allowTcapOps;	/* TcapOps mode			*/
 	Boolean		allowTitleOps;	/* TitleOps mode		*/
 	Boolean		allowWindowOps;	/* WindowOps mode		*/
 
+	Boolean		allowColorOp0;	/* initial ColorOps mode	*/
 	Boolean		allowFontOp0;	/* initial FontOps mode		*/
 	Boolean		allowSendEvent0;/* initial SendEvent mode	*/
 	Boolean		allowTcapOp0;	/* initial TcapOps mode		*/
 	Boolean		allowTitleOp0;	/* initial TitleOps mode	*/
 	Boolean		allowWindowOp0;	/* initial WindowOps mode	*/
+
+	String		disallowedColorOps;
+	char		disallow_color_ops[ecLAST];
+
+	String		disallowedFontOps;
+	char		disallow_font_ops[efLAST];
+
+	String		disallowedTcapOps;
+	char		disallow_tcap_ops[etLAST];
 
 	String		disallowedWinOps;
 	char		disallow_win_ops[ewLAST];
@@ -1723,7 +1763,9 @@ typedef struct {
 	Boolean		hp_ll_bc;	/* kludge HP-style ll for xdb	*/
 	Boolean		marginbell;	/* true if margin bell on	*/
 	int		nmarginbell;	/* columns from right margin	*/
-	int		bellarmed;	/* cursor below bell margin	*/
+	int		bellArmed;	/* cursor below bell margin	*/
+	BellVolume	marginVolume;	/* margin-bell volume           */
+	BellVolume	warningVolume;	/* warning-bell volume          */
 	Boolean		multiscroll;	/* true if multi-scroll		*/
 	int		scrolls;	/* outstanding scroll count,
 					    used only with multiscroll	*/
@@ -2406,8 +2448,15 @@ typedef struct _TekWidgetRec {
 
 #define AllowXtermOps(w,name)	(TScreenOf(w)->name && !TScreenOf(w)->allowSendEvents)
 
-#define AllowFontOps(w)		AllowXtermOps(w, allowFontOps)
-#define AllowTcapOps(w)		AllowXtermOps(w, allowTcapOps)
+#define AllowColorOps(w,name)	(AllowXtermOps(w, allowColorOps) || \
+				 !TScreenOf(w)->disallow_color_ops[name])
+
+#define AllowFontOps(w,name)	(AllowXtermOps(w, allowFontOps) || \
+				 !TScreenOf(w)->disallow_font_ops[name])
+
+#define AllowTcapOps(w,name)	(AllowXtermOps(w, allowTcapOps) || \
+				 !TScreenOf(w)->disallow_tcap_ops[name])
+
 #define AllowTitleOps(w)	AllowXtermOps(w, allowTitleOps)
 
 #define AllowWindowOps(w,name)	(AllowXtermOps(w, allowWindowOps) || \

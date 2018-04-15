@@ -1,4 +1,4 @@
-/* $XTermId: button.c,v 1.362 2009/12/09 10:19:43 tom Exp $ */
+/* $XTermId: button.c,v 1.364 2010/01/04 23:13:01 tom Exp $ */
 
 /*
  * Copyright 1999-2008,2009 by Thomas E. Dickey
@@ -1252,7 +1252,7 @@ overrideTargets(Widget w, String value, Atom ** resultp)
     if ((xw = getXtermWidget(w)) != 0) {
 	TScreen *screen = TScreenOf(xw);
 
-	if (value != 0 && *value != '\0') {
+	if (!IsEmpty(value)) {
 	    String copied = x_strdup(value);
 	    if (copied != 0) {
 		Atom *result = 0;
@@ -3443,7 +3443,7 @@ AppendToSelectionBuffer(TScreen * screen, unsigned c)
 }
 
 void
-CompleteSelection(XtermWidget xw, char **args, Cardinal len)
+CompleteSelection(XtermWidget xw, String * args, Cardinal len)
 {
     TScreen *screen = TScreenOf(xw);
 
