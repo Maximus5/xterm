@@ -1,7 +1,7 @@
-/* $XTermId: charproc.c,v 1.1393 2014/12/28 22:12:39 tom Exp $ */
+/* $XTermId: charproc.c,v 1.1407 2015/03/02 11:46:32 tom Exp $ */
 
 /*
- * Copyright 1999-2013,2014 by Thomas E. Dickey
+ * Copyright 1999-2014,2015 by Thomas E. Dickey
  *
  *                         All Rights Reserved
  *
@@ -2711,7 +2711,6 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 			reply.a_param[count++] = 3;	/* ReGIS graphics */
 		    }
 #endif
-		    reply.a_param[count++] = 6;		/* selective-erase */
 #if OPT_SIXEL_GRAPHICS
 		    if (screen->terminal_id == 240 ||
 			screen->terminal_id == 241 ||
@@ -3204,7 +3203,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 		    reply.a_radix[count] = 16;	/* no data */
 		    reply.a_param[count++] = 0;		/* no space for macros */
 		    reply.a_inters = '*';
-		    reply.a_final = '{';
+		    reply.a_final = L_CURL;
 		}
 		break;
 	    case 63:
@@ -3322,8 +3321,10 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 		dpmodes(xw, bitset);
 	    ResetState(sp);
 #if OPT_TEK4014
-	    if (TEK4014_ACTIVE(xw))
+	    if (TEK4014_ACTIVE(xw)) {
+		TRACE(("Tek4014 is now active...\n"));
 		return False;
+	    }
 #endif
 	    break;
 
@@ -3558,6 +3559,8 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 		 */
 		if (GetParam(0) >= 61
 		    && GetParam(0) <= 60 + (screen->terminal_id / 100)) {
+		    int new_vtXX_level = GetParam(0) - 60;
+		    int case_value = zero_if_default(1);
 		    /*
 		     * VT300, VT420, VT520 manuals claim that DECSCL does a
 		     * hard reset (RIS).  VT220 manual states that it is a soft
@@ -3566,9 +3569,9 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 		     */
 		    ReallyReset(xw, False, False);
 		    init_parser(xw, sp);
-		    screen->vtXX_level = GetParam(0) - 60;
-		    if (GetParam(0) > 61) {
-			switch (zero_if_default(1)) {
+		    screen->vtXX_level = new_vtXX_level;
+		    if (new_vtXX_level > 1) {
+			switch (case_value) {
 			case 1:
 			    show_8bit_control(False);
 			    break;
@@ -3770,8 +3773,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 
 	case CASE_DECDC:
 	    TRACE(("CASE_DC - delete column\n"));
-	    if (screen->vtXX_level >= 4
-		&& IsLeftRightMode(xw)) {
+	    if (screen->vtXX_level >= 4) {
 		xtermColScroll(xw, one_if_default(0), True, screen->cur_col);
 	    }
 	    ResetState(sp);
@@ -3779,8 +3781,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 
 	case CASE_DECIC:
 	    TRACE(("CASE_IC - insert column\n"));
-	    if (screen->vtXX_level >= 4
-		&& IsLeftRightMode(xw)) {
+	    if (screen->vtXX_level >= 4) {
 		xtermColScroll(xw, one_if_default(0), False, screen->cur_col);
 	    }
 	    ResetState(sp);
@@ -3869,12 +3870,12 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 	    sp->parsestate = csi_ex_table;
 	    break;
 
-#if OPT_DEC_LOCATOR
 	case CASE_CSI_TICK_STATE:
 	    /* csi tick (') */
 	    sp->parsestate = csi_tick_table;
 	    break;
 
+#if OPT_DEC_LOCATOR
 	case CASE_DECEFR:
 	    TRACE(("CASE_DECEFR - Enable Filter Rectangle\n"));
 	    if (screen->send_mouse_pos == DEC_LOCATOR) {
@@ -5000,7 +5001,11 @@ dotext(XtermWidget xw,
 		}
 		width_here -= last_chomp;
 		if (chars_chomped > 0) {
-		    need_wrap = True;
+		    if (!(xw->flags & WRAPAROUND)) {
+			buf[chars_chomped + offset - 1] = buf[len - 1];
+		    } else {
+			need_wrap = True;
+		    }
 		}
 	    } else if (width_here == width_available) {
 		need_wrap = True;
@@ -5387,6 +5392,7 @@ dpmodes(XtermWidget xw, BitFunc func)
 	    if (IsSM() && !(screen->inhibit & I_TEK)) {
 		FlushLog(xw);
 		TEK4014_ACTIVE(xw) = True;
+		TRACE(("Tek4014 is now active...\n"));
 		update_vttekmode();
 	    }
 	    break;
@@ -6551,7 +6557,10 @@ window_ops(XtermWidget xw)
     case ewGetScreenSizeChars:	/* Report the screen's size, in characters */
 	if (AllowWindowOps(xw, ewGetScreenSizeChars)) {
 	    TRACE(("...get screen size in characters\n"));
-	    (void) QueryMaximize(xw, &root_height, &root_width);
+	    TRACE(("...using font size %dx%d\n",
+		   FontHeight(screen),
+		   FontWidth(screen)));
+	    (void) QueryMaximize(xw, &root_width, &root_height);
 	    init_reply(ANSI_CSI);
 	    reply.a_pintro = 0;
 	    reply.a_nparam = 3;
@@ -7834,7 +7843,7 @@ VTInitialize(Widget wrequest,
     init_Bres(screen.old_fkeys);
     wnew->screen.old_fkeys0 = wnew->screen.old_fkeys;
 
-    init_Bres(screen.delete_is_del);
+    init_Mres(screen.delete_is_del);
     initializeKeyboardType(wnew);
 #ifdef ALLOWLOGGING
     init_Bres(misc.logInhibit);
@@ -8221,7 +8230,7 @@ VTInitialize(Widget wrequest,
     init_Tres(HIGHLIGHT_BG);
     init_Tres(HIGHLIGHT_FG);
     init_Bres(screen.hilite_reverse);
-    init_Bres(screen.hilite_color);
+    init_Mres(screen.hilite_color);
     if (TScreenOf(wnew)->hilite_color == Maybe) {
 	TScreenOf(wnew)->hilite_color = False;
 #if OPT_COLOR_RES
@@ -9028,8 +9037,8 @@ VTRealize(Widget w,
     TScreen *screen = TScreenOf(xw);
 
     const VTFontNames *myfont;
-    unsigned width, height;
-    int xpos, ypos, pr;
+    struct Xinerama_geometry pos;
+    int pr;
     Atom pid_atom;
     int i;
 
@@ -9113,22 +9122,21 @@ VTRealize(Widget w,
     }
 
     /* set defaults */
-    xpos = 1;
-    ypos = 1;
-    width = 80;
-    height = 24;
+    pos.x = 1;
+    pos.y = 1;
+    pos.w = 80;
+    pos.h = 24;
 
     TRACE(("parsing geo_metry %s\n", NonNull(xw->misc.geo_metry)));
-    pr = XParseGeometry(xw->misc.geo_metry, &xpos, &ypos,
-			&width, &height);
-    TRACE(("... position %d,%d size %dx%d\n", ypos, xpos, height, width));
+    pr = XParseXineramaGeometry(screen->display, xw->misc.geo_metry, &pos);
+    TRACE(("... position %d,%d size %dx%d\n", pos.y, pos.x, pos.h, pos.w));
 
-    set_max_col(screen, (int) (width - 1));	/* units in character cells */
-    set_max_row(screen, (int) (height - 1));	/* units in character cells */
+    set_max_col(screen, (int) (pos.w - 1));	/* units in character cells */
+    set_max_row(screen, (int) (pos.h - 1));	/* units in character cells */
     xtermUpdateFontInfo(xw, False);
 
-    width = screen->fullVwin.fullwidth;
-    height = screen->fullVwin.fullheight;
+    pos.w = screen->fullVwin.fullwidth;
+    pos.h = screen->fullVwin.fullheight;
 
     TRACE(("... border widget %d parent %d shell %d\n",
 	   BorderWidth(xw),
@@ -9136,15 +9144,17 @@ VTRealize(Widget w,
 	   BorderWidth(SHELL_OF(xw))));
 
     if ((pr & XValue) && (XNegative & pr)) {
-	xpos += (DisplayWidth(screen->display, DefaultScreen(screen->display))
-		 - (int) width
-		 - (BorderWidth(XtParent(xw)) * 2));
+	pos.x = (Position) (pos.x + (pos.scr_w
+				     - (int) pos.w
+				     - (BorderWidth(XtParent(xw)) * 2)));
     }
     if ((pr & YValue) && (YNegative & pr)) {
-	ypos += (DisplayHeight(screen->display, DefaultScreen(screen->display))
-		 - (int) height
-		 - (BorderWidth(XtParent(xw)) * 2));
+	pos.y = (Position) (pos.y + (pos.scr_h
+				     - (int) pos.h
+				     - (BorderWidth(XtParent(xw)) * 2)));
     }
+    pos.x = (Position) (pos.x + pos.scr_x);
+    pos.y = (Position) (pos.y + pos.scr_y);
 
     /* set up size hints for window manager; min 1 char by 1 char */
     getXtermSizeHints(xw);
@@ -9153,8 +9163,8 @@ VTRealize(Widget w,
 			   + BorderWidth(screen->scrollWidget))
 			: 0));
 
-    xw->hints.x = xpos;
-    xw->hints.y = ypos;
+    xw->hints.x = pos.x;
+    xw->hints.y = pos.y;
 #if OPT_MAXIMIZE
     /* assure single-increment resize for fullscreen */
     if (term->work.ewmh[0].mode) {
@@ -9198,7 +9208,7 @@ VTRealize(Widget w,
      * is for the vt100 widget.  They are not the same size.
      */
     (void) REQ_RESIZE((Widget) xw,
-		      (Dimension) width, (Dimension) height,
+		      (Dimension) pos.w, (Dimension) pos.h,
 		      &xw->core.width, &xw->core.height);
 
     /* XXX This is bogus.  We are parsing geometries too late.  This
@@ -10438,13 +10448,15 @@ StopBlinking(TScreen *screen)
 Bool
 LineHasBlinking(TScreen *screen, CLineData *ld)
 {
-    int col;
     Bool result = False;
+    if (ld != 0) {
+	int col;
 
-    for (col = 0; col < MaxCols(screen); ++col) {
-	if (ld->attribs[col] & BLINK) {
-	    result = True;
-	    break;
+	for (col = 0; col < MaxCols(screen); ++col) {
+	    if (ld->attribs[col] & BLINK) {
+		result = True;
+		break;
+	    }
 	}
     }
     return result;

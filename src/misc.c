@@ -1,7 +1,7 @@
-/* $XTermId: misc.c,v 1.719 2014/12/28 22:17:58 tom Exp $ */
+/* $XTermId: misc.c,v 1.724 2015/03/02 13:01:43 tom Exp $ */
 
 /*
- * Copyright 1999-2013,2014 by Thomas E. Dickey
+ * Copyright 1999-2014,2015 by Thomas E. Dickey
  *
  *                         All Rights Reserved
  *
@@ -915,16 +915,19 @@ HandleSpawnTerminal(Widget w GCC_UNUSED,
 	} else {
 	    unsigned myargc = *nparams + 1;
 	    char **myargv = TypeMallocN(char *, myargc + 1);
-	    unsigned n = 0;
 
-	    myargv[n++] = child_exe;
+	    if (myargv != 0) {
+		unsigned n = 0;
 
-	    while (n < myargc) {
-		myargv[n++] = (char *) *params++;
+		myargv[n++] = child_exe;
+
+		while (n < myargc) {
+		    myargv[n++] = (char *) *params++;
+		}
+
+		myargv[n] = 0;
+		execv(child_exe, myargv);
 	    }
-
-	    myargv[n] = 0;
-	    execv(child_exe, myargv);
 
 	    /* If we get here, we've failed */
 	    xtermWarning("exec of '%s': %s\n", child_exe, SysErrorMsg(errno));
@@ -3609,6 +3612,8 @@ do_osc(XtermWidget xw, Char *oscbuf, size_t len, int final)
 	    xw->misc.palette_changed = True;
 	break;
     case 6:
+	/* FALLTHRU */
+    case OSC_Reset(6):
 	TRACE(("parse colorXXMode:%s\n", buf));
 	while (*buf != '\0') {
 	    long which = 0;
@@ -4108,7 +4113,7 @@ do_dcs(XtermWidget xw, Char *dcsbuf, size_t dcslen)
 		else if (isCursorBar(screen))
 		    code = STEADY_BAR;
 #if OPT_BLINK_CURS
-		if (screen->cursor_blink_esc == 0)
+		if (screen->cursor_blink_esc != 0)
 		    code -= 1;
 #endif
 		sprintf(reply, "%d%s", code, cp);
@@ -4238,7 +4243,7 @@ do_dcs(XtermWidget xw, Char *dcsbuf, size_t dcslen)
 		    parse_decudk(xw, cp);
 		}
 		break;
-	    case '{':		/* DECDLD (no '}' case though) */
+	    case L_CURL:	/* DECDLD */
 		if (screen->vtXX_level >= 2) {	/* VT220 */
 		    parse_decdld(&params, cp);
 		}
@@ -4773,7 +4778,7 @@ xtermLoadIcon(XtermWidget xw)
 	    myData = BuiltInXPM(xterm_xpms, XtNumber(xterm_xpms));
 	if (myData == 0)
 	    myData = &mini_xterm_xpms[XtNumber(mini_xterm_xpms) - 1];
-	data = (char **) myData->data,
+	data = (char **) myData->data;
 #else
 	data = (char **) &mini_xterm_48x48_xpm;
 #endif

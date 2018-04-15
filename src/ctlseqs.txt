@@ -20,8 +20,8 @@
 
                              Thomas Dickey
                       XFree86 Project (1996-2006)
-                    invisible-island.net (2006-2013)
-               updated for XTerm Patch #314 (2014/12/17)
+                    invisible-island.net (2006-2015)
+               updated for XTerm Patch #315 (2015/02/27)
 
 
 
@@ -210,6 +210,7 @@ DCS $ q Pt ST
             " q     -> DECSCA
             " p     -> DECSCL
             r       -> DECSTBM
+                    -> DECSLRM
             m       -> SGR
             SP q    -> DECSCUSR
           xterm responds with DCS 1 $ r Pt ST for valid requests,
@@ -896,7 +897,7 @@ CSI Ps * x
 CSI Pi ; Pg ; Pt; Pl; Pb; Pr * y
           Request Checksum of Rectangular Area (DECRQCRA), VT420 and up.
           Response is
-          DCS Pt ! x x x x ST
+          DCS Pi ! x x x x ST
             Pi is the request id.
             Pg is the page number.
             Pt; Pl; Pb; Pr denotes the rectangle.
@@ -1017,16 +1018,8 @@ OSC Ps ; Pt BEL
               Pc = 3  <- resource colorRV (REVERSE).
               Pc = 4  <- resource colorIT (ITALIC).
 
-            Ps = 6 ; c; f -> Enable/disable Special Color Number c.  The
-          second parameter tells xterm to enable the corresponding color
-          mode if nonzero, disable it if zero.
-
-              Pc = 0  <- resource colorBDMode (BOLD).
-              Pc = 1  <- resource colorULMode (UNDERLINE).
-              Pc = 2  <- resource colorBLMode (BLINK).
-              Pc = 3  <- resource colorRVMode (REVERSE).
-              Pc = 4  <- resource colorITMode (ITALIC).
-              Pc = 5  <- resource colorAttrMode (Override ANSI).
+            Ps = 6 ; c; f -> Enable/disable Special Color Number c.  OSC
+          6  is the same as OSC 1 0 6 .
 
           The 10 colors (below) which may be set or queried using 1 0
           through 1 9  are denoted dynamic colors, since the correspond-
@@ -1108,6 +1101,17 @@ OSC Ps ; Pt BEL
           spond to the special colors which can be set using an OSC 5
           control (or by adding the maximum number of colors using an
           OSC 4  control).
+
+            Ps = 1 0 6 ; c; f -> Enable/disable Special Color Number c.
+          The second parameter tells xterm to enable the corresponding
+          color mode if nonzero, disable it if zero.
+
+              Pc = 0  <- resource colorBDMode (BOLD).
+              Pc = 1  <- resource colorULMode (UNDERLINE).
+              Pc = 2  <- resource colorBLMode (BLINK).
+              Pc = 3  <- resource colorRVMode (REVERSE).
+              Pc = 4  <- resource colorITMode (ITALIC).
+              Pc = 5  <- resource colorAttrMode (Override ANSI).
 
           The dynamic colors can also be reset to their default
           (resource) values:
