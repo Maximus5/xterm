@@ -1,6 +1,6 @@
 .\"#! troff -ms $1		-*- Nroff -*-
 .\" "Xterm Control Sequences" document
-.\" $XTermId: ctlseqs.ms,v 1.194 2009/11/10 01:15:53 tom Exp $
+.\" $XTermId: ctlseqs.ms,v 1.201 2009/12/07 09:59:49 tom Exp $
 .\"
 .\"
 .\" Copyright 1996-2008,2009 by Thomas E. Dickey
@@ -682,6 +682,17 @@ Initiate highlight mouse tracking.
 Parameters are [func;startx;starty;firstrow;lastrow].
 See the section \fBMouse Tracking\fP.
 .
+.IP \\*(Cs\\*>\\*(Ps\\*;\\*(Ps\\*s\\*T
+Reset one or more features of the title modes to the default value.
+Normally, "reset" disables the feature.
+It is possible to disable the ability to reset features
+by compiling a different default for the title modes into \fIxterm\fP.
+  \*(Ps = \*0 \(-> Do not set window/icon labels using hexadecimal
+  \*(Ps = \*1 \(-> Do not query window/icon labels using hexadecimal
+  \*(Ps = \*2 \(-> Do not set window/icon labels using UTF-8
+  \*(Ps = \*3 \(-> Do not query window/icon labels using UTF-8
+(See discussion of "Title Modes")
+.
 .IP \\*(Cs\\*(Ps\\*s\\*(XX
 Erase \*(Ps Character(s) (default = 1) (ECH)
 .
@@ -1062,6 +1073,14 @@ Valid values for the second parameter:
   \*(Ps = \*1 \(-> 7-bit controls (always set for VT100)
   \*(Ps = \*2 \(-> 8-bit controls
 .
+.IP \\*(Cs\\*(Ps\\*s\\*(Sp"\\*q
+Set cursor style (DECSCUSR, VT520)
+  \*(Ps = \*0 \(-> blinking block
+  \*(Ps = \*1 \(-> blinking block (default)
+  \*(Ps = \*2 \(-> steady block
+  \*(Ps = \*3 \(-> blinking underline
+  \*(Ps = \*4 \(-> steady underline
+.
 .IP \\*(Cs\\*(Ps\\*s\\*(c"\\*q
 Select character protection attribute (DECSCA).
 Valid values for the parameter:
@@ -1128,6 +1147,15 @@ If the \fIxterm\fP window is iconified, it returns \*(Cs\*2\*t.
 Reverse Attributes in Rectangular Area (DECRARA).
   \*(Pt\*;\*(Pl\*;\*(Pb\*;\*(Pr denotes the rectangle.
   \*(Ps denotes the attributes to reverse. 1, 4, 5, 7
+.
+.IP \\*(Cs\\*>\\*(Ps\\*;\\*(Ps\\*s\\*t
+Set one or more features of the title modes.
+Each parameter enables a single feature.
+  \*(Ps = \*0 \(-> Set window/icon labels using hexadecimal
+  \*(Ps = \*1 \(-> Query window/icon labels using hexadecimal
+  \*(Ps = \*2 \(-> Set window/icon labels using UTF-8
+  \*(Ps = \*3 \(-> Query window/icon labels using UTF-8
+(See discussion of "Title Modes")
 .
 .IP \\*(Cs\\*u
 Restore cursor (ANSI.SYS)
@@ -1286,7 +1314,19 @@ to set the corresponding color.
 Because more than one pair of color number and specification can
 be given in one control sequence, \fBxterm\fR can make more than one reply.
 .sp
-The 8 colors which may be set using \*1\*0 through \*1\*7 are
+  \*(Ps = \*5 ; \fIc ; spec\fP \(-> Change Special Color Number \fIc\fP to
+the color specified by \fIspec\fP,
+i.e., a name or RGB specification as per \fIXParseColor\fP.
+Any number of \fIc name\fP pairs may be given.
+The special colors can also be set by adding the maximum number of colors
+to these codes in an \*(Os\*4 control:
+.sp
+  \*(Pc = 0 \(-> resource \fBcolorBD\fP (BOLD)
+  \*(Pc = 1 \(-> resource \fBcolorUL\fP (UNDERLINE)
+  \*(Pc = 2 \(-> resource \fBcolorBL\fP (BLINK)
+  \*(Pc = 3 \(-> resource \fBcolorRV\fP (REVERSE)
+.sp
+The 8 colors (below) which may be set using \*1\*0 through \*1\*7 are
 denoted \fIdynamic colors\fR, since the corresponding control sequences
 were the first means for setting \fBxterm\fR's colors dynamically,
 i.e., after it was started.
@@ -1349,6 +1389,32 @@ If the second parameter is a \*?,
 \fIxterm\fP replies to the host with the selection
 data encoded using the same protocol.
 .Ed
+.sp
+  \*(Ps = \*1\*0\*4 ; \fIc\fP \(-> Reset Color Number \fIc\fP to
+the color specified by the corresponding X resource.
+Any number of \fIc\fP parameters may be given.
+These parameters correspond to the ANSI colors 0-7,
+their bright versions 8-15,
+and if supported, the remainder of the 88-color or 256-color table.
+If no parameters are given, the entire table will be reset.
+.sp
+  \*(Ps = \*1\*0\*5 ; \fIc\fP \(-> Reset Special Color Number \fIc\fP to
+the color specified by the corresponding X resource.
+Any number of \fIc\fP parameters may be given.
+These parameters correspond to the special colors which can be set
+using an \*(Os\*5 control (or by adding the maximum number of colors
+using an \*(Os\*4 control).
+.sp
+The \fIdynamic colors\fR can also be reset to their default (resource) values:
+  \*(Ps = \*1\*1\*0 \(-> Reset VT100 text foreground color.
+  \*(Ps = \*1\*1\*1 \(-> Reset VT100 text background color.
+  \*(Ps = \*1\*1\*2 \(-> Reset text cursor color.
+  \*(Ps = \*1\*1\*3 \(-> Reset mouse foreground color.
+  \*(Ps = \*1\*1\*4 \(-> Reset mouse background color.
+  \*(Ps = \*1\*1\*5 \(-> Reset Tektronix foreground color.
+  \*(Ps = \*1\*1\*6 \(-> Reset Tektronix background color.
+  \*(Ps = \*1\*1\*7 \(-> Reset highlight color.
+  \*(Ps = \*1\*1\*8 \(-> Reset Tektronix cursor color.
 .
 .St
 .LP
@@ -1741,6 +1807,7 @@ and alternate screen buffers simply disable the switching.
 They add other features such as clearing the display for the same reason:
 to make the details of switching independent of the application that
 requests the switch.
+.
 .SH
 Bracketed Paste Mode
 .ds RH Bracketed Paste Mode
@@ -1751,6 +1818,44 @@ so that the program can differentiate pasted text from typed-in text.
 When bracketed paste mode is set,
 the program will receive: ESC [ 200 ~,
 followed by the pasted text, followed by ESC [ 201 ~.
+.
+.SH
+Title Modes
+.ds RH Title Modes
+.LP
+The window- and icon-labels can be set or queried using control sequences.
+As a VT220-emulator, \fIxterm\fP "should" limit the character encoding for
+the corresponding strings to ISO-8859-1.
+Indeed, it used to be the case (and was documented) that
+window titles had to be ISO-8859-1.
+This is no longer the case.
+However, there are many applications which still assume that titles are
+set using ISO-8859-1.
+So that is the default behavior.
+.LP
+If \fIxterm\fP is running with UTF-8 encoding,
+it is possible to use window- and icon-labels encoded using UTF-8.
+That is because the underlying X libraries (and many, but not all)
+window managers support this feature.
+.LP
+The \fButf8Title\fP X resource setting tells \fIxterm\fP to disable
+a reconversion of the title string back to ISO-8859-1,
+allowing the title strings to be interpreted as UTF-8.
+The same feature can be enabled using the title mode control sequence
+described in this summary. 
+.LP
+Separate from the ability to set the titles,
+\fIxterm\fP provides the ability to query the titles,
+returning them either in ISO-8859-1 or UTF-8.
+This choice is available only while \fIxterm\fP is using UTF-8 encoding.
+.LP
+Finally, the characters sent to, or returned by a title control
+are less constrained than the rest of the control sequences.
+To make them more manageable (and constrained), for use in shell scripts,
+\fIxterm\fP has an optional feature which decodes the string from hexadecimal
+(for setting titles) or for encoding the title into hexadecimal when querying
+the value.
+.
 .SH
 Mouse Tracking
 .ds RH Mouse Tracking

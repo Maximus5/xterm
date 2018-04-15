@@ -1,4 +1,4 @@
-/* $XTermId: fontutils.c,v 1.320 2009/11/05 23:45:11 tom Exp $ */
+/* $XTermId: fontutils.c,v 1.325 2009/12/02 10:17:52 tom Exp $ */
 
 /************************************************************
 
@@ -42,6 +42,7 @@ authorization.
 
 #include <fontutils.h>
 #include <X11/Xmu/Drawing.h>
+#include <X11/Xmu/CharSet.h>
 
 #include <main.h>
 #include <data.h>
@@ -748,7 +749,7 @@ xtermOpenFont(XtermWidget xw,
 	    } else {
 		result->fn = x_strdup(name);
 	    }
-	} else if (strcmp(name, DEFFONT)) {
+	} else if (XmuCompareISOLatin1(name, DEFFONT) != 0) {
 	    if (warn <= xw->misc.fontWarnings
 #if OPT_RENDERFONT
 		&& !UsingRenderFont(xw)
@@ -756,6 +757,17 @@ xtermOpenFont(XtermWidget xw,
 		) {
 		TRACE(("OOPS: cannot load font %s\n", name));
 		fprintf(stderr, "%s: cannot load font %s\n", ProgramName, name);
+#if OPT_RENDERFONT
+		/*
+		 * Do a sanity check in case someone's mixed up xterm with
+		 * one of those programs that read their resource data from
+		 * xterm's namespace.
+		 */
+		if (strchr(name, ':') != 0 || strchr(name, '=') != 0) {
+		    fprintf(stderr,
+			    "Use the \"-fa\" option for the Xft fonts\n");
+		}
+#endif
 	    } else {
 		TRACE(("xtermOpenFont: cannot load font %s\n", name));
 	    }
@@ -1712,6 +1724,27 @@ checkFontInfo(int value, const char *tag)
     }
 }
 
+#if OPT_RENDERFONT
+/*
+ * Get the faceName/faceDoublesize resource setting.  Strip off "xft:", which
+ * is not recognized by XftParseName().
+ */
+static char *
+getFaceName(XtermWidget xw, char *wideName GCC_UNUSED)
+{
+#if OPT_RENDERWIDE
+    char *result = ((wideName != NULL)
+		    ? xw->misc.face_wide_name
+		    : xw->misc.face_name);
+#else
+    char *result = xw->misc.face_name;
+#endif
+    if (!strncmp(result, "xft:", 4))
+	result += 4;
+    return x_nonempty(result);
+}
+#endif
+
 /*
  * Compute useful values for the font/window sizes
  */
@@ -1734,6 +1767,7 @@ xtermComputeFontInfo(XtermWidget xw,
      * overrides it.
      */
     if (xw->misc.render_font && !IsIconWin(screen, win)) {
+	char *face_name = getFaceName(xw, NULL);
 	int fontnum = screen->menu_font_number;
 	XftFont *norm = screen->renderFontNorm[fontnum].font;
 	XftFont *bold = screen->renderFontBold[fontnum].font;
@@ -1744,12 +1778,12 @@ xtermComputeFontInfo(XtermWidget xw,
 	XftFont *wital = screen->renderWideItal[fontnum].font;
 #endif
 
-	if (norm == 0 && xw->misc.face_name) {
+	if (norm == 0 && face_name) {
 	    XftPattern *pat;
 	    double face_size = xw->misc.face_size[fontnum];
 
 	    TRACE(("xtermComputeFontInfo norm(face %s, size %f)\n",
-		   xw->misc.face_name,
+		   face_name,
 		   xw->misc.face_size[fontnum]));
 
 	    if (face_size <= 0.0) {
@@ -1825,8 +1859,8 @@ xtermComputeFontInfo(XtermWidget xw,
 	    XFT_SLANT, XftTypeInteger, XFT_SLANT_ITALIC, \
 	    XFT_CHAR_WIDTH, XftTypeInteger, norm->max_advance_width
 
-	    if ((pat = XftNameParse(xw->misc.face_name)) != 0) {
-#define OPEN_XFT(tag) xtermOpenXft(xw, xw->misc.face_name, pat, tag)
+	    if ((pat = XftNameParse(face_name)) != 0) {
+#define OPEN_XFT(tag) xtermOpenXft(xw, face_name, pat, tag)
 		XftPatternBuild(pat,
 				NormXftPattern,
 				(void *) 0);
@@ -1840,7 +1874,7 @@ xtermComputeFontInfo(XtermWidget xw,
 
 #if OPT_ISO_COLORS
 		    if (screen->italicULMode
-			&& (pat = XftNameParse(xw->misc.face_name)) != 0) {
+			&& (pat = XftNameParse(face_name)) != 0) {
 			XftPatternBuild(pat,
 					NormXftPattern,
 					ItalXftPattern(norm),
@@ -1873,9 +1907,6 @@ xtermComputeFontInfo(XtermWidget xw,
 	     */
 #if OPT_RENDERWIDE
 	    if (norm != 0 && screen->wide_chars) {
-		char *face_name = (xw->misc.face_wide_name
-				   ? xw->misc.face_wide_name
-				   : xw->misc.face_name);
 		int char_width = norm->max_advance_width * 2;
 #ifdef FC_ASPECT
 		double aspect = ((xw->misc.face_wide_name
@@ -1884,6 +1915,7 @@ xtermComputeFontInfo(XtermWidget xw,
 				 : 2.0);
 #endif
 
+		face_name = getFaceName(xw, xw->misc.face_wide_name);
 		TRACE(("xtermComputeFontInfo wide(face %s, char_width %d)\n",
 		       face_name,
 		       char_width));

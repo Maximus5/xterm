@@ -1,4 +1,4 @@
-/* $XTermId: misc.c,v 1.431 2009/11/11 00:25:16 tom Exp $ */
+/* $XTermId: misc.c,v 1.456 2009/12/08 00:49:07 tom Exp $ */
 
 /*
  *
@@ -225,13 +225,11 @@ DoSpecialEnterNotify(XtermWidget xw, XEnterWindowEvent * ev)
     TScreen *screen = TScreenOf(xw);
 
     TRACE(("DoSpecialEnterNotify(%d)\n", screen->select));
-#ifdef ACTIVEWINDOWINPUTONLY
-    if (ev->window == XtWindow(XtParent(CURRENT_EMU())))
-#endif
-	if (((ev->detail) != NotifyInferior) &&
-	    ev->focus &&
-	    !(screen->select & FOCUS))
-	    selectwindow(screen, INWINDOW);
+    TRACE_FOCUS(xw, ev);
+    if (((ev->detail) != NotifyInferior) &&
+	ev->focus &&
+	!(screen->select & FOCUS))
+	selectwindow(screen, INWINDOW);
 }
 
 static void
@@ -240,13 +238,11 @@ DoSpecialLeaveNotify(XtermWidget xw, XEnterWindowEvent * ev)
     TScreen *screen = TScreenOf(xw);
 
     TRACE(("DoSpecialLeaveNotify(%d)\n", screen->select));
-#ifdef ACTIVEWINDOWINPUTONLY
-    if (ev->window == XtWindow(XtParent(CURRENT_EMU())))
-#endif
-	if (((ev->detail) != NotifyInferior) &&
-	    ev->focus &&
-	    !(screen->select & FOCUS))
-	    unselectwindow(screen, INWINDOW);
+    TRACE_FOCUS(xw, ev);
+    if (((ev->detail) != NotifyInferior) &&
+	ev->focus &&
+	!(screen->select & FOCUS))
+	unselectwindow(screen, INWINDOW);
 }
 
 #ifndef XUrgencyHint
@@ -517,10 +513,7 @@ HandleKeyPressed(Widget w GCC_UNUSED,
 		 Cardinal *nparams GCC_UNUSED)
 {
     TRACE(("Handle insert-seven-bit for %p\n", (void *) w));
-#ifdef ACTIVEWINDOWINPUTONLY
-    if (w == CURRENT_EMU())
-#endif
-	Input(term, &event->xkey, False);
+    Input(term, &event->xkey, False);
 }
 
 /* ARGSUSED */
@@ -531,10 +524,7 @@ HandleEightBitKeyPressed(Widget w GCC_UNUSED,
 			 Cardinal *nparams GCC_UNUSED)
 {
     TRACE(("Handle insert-eight-bit for %p\n", (void *) w));
-#ifdef ACTIVEWINDOWINPUTONLY
-    if (w == CURRENT_EMU())
-#endif
-	Input(term, &event->xkey, True);
+    Input(term, &event->xkey, True);
 }
 
 /* ARGSUSED */
@@ -544,10 +534,6 @@ HandleStringEvent(Widget w GCC_UNUSED,
 		  String * params,
 		  Cardinal *nparams)
 {
-#ifdef ACTIVEWINDOWINPUTONLY
-    if (w != CURRENT_EMU())
-	return;
-#endif
 
     if (*nparams != 1)
 	return;
@@ -555,10 +541,11 @@ HandleStringEvent(Widget w GCC_UNUSED,
     if ((*params)[0] == '0' && (*params)[1] == 'x' && (*params)[2] != '\0') {
 	const char *abcdef = "ABCDEF";
 	const char *xxxxxx;
-	Char c, *p;
+	Char c;
+	UString p;
 	unsigned value = 0;
 
-	for (p = (Char *) (*params + 2); (c = CharOf(x_toupper(*p))) !=
+	for (p = (UString) (*params + 2); (c = CharOf(x_toupper(*p))) !=
 	     '\0'; p++) {
 	    value *= 16;
 	    if (c >= '0' && c <= '9')
@@ -592,7 +579,7 @@ HandleSpawnTerminal(Widget w GCC_UNUSED,
 		    String * params,
 		    Cardinal *nparams)
 {
-    TScreen *screen = &term->screen;
+    TScreen *screen = TScreenOf(term);
     char *child_cwd = NULL;
     char *child_exe;
     pid_t pid;
@@ -712,6 +699,7 @@ HandleEnterWindow(Widget w GCC_UNUSED,
 {
     /* NOP since we handled it above */
     TRACE(("HandleEnterWindow ignored\n"));
+    TRACE_FOCUS(w, event);
 }
 
 /*ARGSUSED*/
@@ -723,6 +711,7 @@ HandleLeaveWindow(Widget w GCC_UNUSED,
 {
     /* NOP since we handled it above */
     TRACE(("HandleLeaveWindow ignored\n"));
+    TRACE_FOCUS(w, event);
 }
 
 /*ARGSUSED*/
@@ -740,6 +729,7 @@ HandleFocusChange(Widget w GCC_UNUSED,
 	   visibleEventType(event->type),
 	   event->mode,
 	   event->detail));
+    TRACE_FOCUS(xw, event);
 
     if (screen->quiet_grab
 	&& (event->mode == NotifyGrab || event->mode == NotifyUngrab)) {
@@ -912,7 +902,7 @@ VisualBell(void)
 	visualGC = XtGetGC((Widget) term, GCFunction + GCForeground, &gcval);
 #if OPT_TEK4014
 	if (TEK4014_ACTIVE(term)) {
-	    TekScreen *tekscr = &(tekWidget->screen);
+	    TekScreen *tekscr = TekScreenOf(tekWidget);
 	    flashWindow(screen, TWindow(tekscr), visualGC,
 			TFullWidth(tekscr),
 			TFullHeight(tekscr));
@@ -954,7 +944,7 @@ WMFrameWindow(XtermWidget termw)
     do {
 	if (win_parent)
 	    win_current = win_parent;
-	XQueryTree((&termw->screen)->display,
+	XQueryTree(TScreenOf(termw)->display,
 		   win_current,
 		   &win_root,
 		   &win_parent,
@@ -1141,7 +1131,7 @@ HandleDabbrevExpand(Widget w,
 
     TRACE(("Handle dabbrev-expand for %p\n", (void *) w));
     if ((xw = getXtermWidget(w)) != 0) {
-	TScreen *screen = &xw->screen;
+	TScreen *screen = TScreenOf(xw);
 	if (!dabbrev_expand(screen))
 	    Bell(XkbBI_TerminalBell, 0);
     }
@@ -1184,7 +1174,7 @@ HandleIconify(Widget w,
 int
 QueryMaximize(XtermWidget termw, unsigned *width, unsigned *height)
 {
-    TScreen *screen = &termw->screen;
+    TScreen *screen = TScreenOf(termw);
     XSizeHints hints;
     long supp = 0;
     Window root_win;
@@ -1236,7 +1226,7 @@ QueryMaximize(XtermWidget termw, unsigned *width, unsigned *height)
 void
 RequestMaximize(XtermWidget termw, int maximize)
 {
-    TScreen *screen = &termw->screen;
+    TScreen *screen = TScreenOf(termw);
     XWindowAttributes wm_attrs, vshell_attrs;
     unsigned root_width, root_height;
 
@@ -1361,7 +1351,7 @@ Redraw(void)
     }
 #if OPT_TEK4014
     if (TEK4014_SHOWN(term)) {
-	TekScreen *tekscr = &(tekWidget->screen);
+	TekScreen *tekscr = TekScreenOf(tekWidget);
 	event.window = TWindow(tekscr);
 	event.width = tekWidget->core.width;
 	event.height = tekWidget->core.height;
@@ -1530,7 +1520,7 @@ creat_as(uid_t uid, gid_t gid, Bool append, char *pathname, int mode)
 	   If we can check for this possibility without hanging, do so.
 	 */
 	do
-	    if (waited == term->screen.pid)
+	    if (waited == TScreenOf(term)->pid)
 		Cleanup(0);
 	while ((waited = nonblocking_wait()) > 0) ;
 #endif /* HAVE_WAITPID */
@@ -1755,8 +1745,8 @@ ReportAnsiColorRequest(XtermWidget xw, int colornum, int final)
     char buffer[80];
 
     TRACE(("ReportAnsiColorRequest %d\n", colornum));
-    color.pixel = GET_COLOR_RES(xw->screen.Acolors[colornum]);
-    XQueryColor(xw->screen.display, cmap, &color);
+    color.pixel = GET_COLOR_RES(xw, TScreenOf(xw)->Acolors[colornum]);
+    XQueryColor(TScreenOf(xw)->display, cmap, &color);
     sprintf(buffer, "4;%d;rgb:%04x/%04x/%04x",
 	    colornum,
 	    color.red,
@@ -1898,7 +1888,7 @@ AllocateAnsiColor(XtermWidget xw,
 {
     int result;
     XColor def;
-    TScreen *screen = &xw->screen;
+    TScreen *screen = TScreenOf(xw);
     Colormap cmap = xw->core.colormap;
 
     if (XParseColor(screen->display, cmap, spec, &def)
@@ -1930,7 +1920,7 @@ AllocateAnsiColor(XtermWidget xw,
 
 #if OPT_COLOR_RES
 Pixel
-xtermGetColorRes(ColorRes * res)
+xtermGetColorRes(XtermWidget xw, ColorRes * res)
 {
     Pixel result = 0;
 
@@ -1938,13 +1928,13 @@ xtermGetColorRes(ColorRes * res)
 	result = res->value;
     } else {
 	TRACE(("xtermGetColorRes for Acolors[%d]\n",
-	       res - term->screen.Acolors));
+	       res - TScreenOf(xw)->Acolors));
 
-	if (res >= term->screen.Acolors) {
-	    assert(res - term->screen.Acolors < MAXCOLORS);
+	if (res >= TScreenOf(xw)->Acolors) {
+	    assert(res - TScreenOf(xw)->Acolors < MAXCOLORS);
 
-	    if (AllocateAnsiColor(term, res, res->resource) < 0) {
-		res->value = term->screen.Tcolors[TEXT_FG].value;
+	    if (AllocateAnsiColor(xw, res, res->resource) < 0) {
+		res->value = TScreenOf(xw)->Tcolors[TEXT_FG].value;
 		res->mode = -True;
 		fprintf(stderr,
 			"%s: Cannot allocate color %s\n",
@@ -1960,15 +1950,45 @@ xtermGetColorRes(ColorRes * res)
 }
 #endif
 
+static int
+ChangeOneAnsiColor(XtermWidget xw, int color, char *name)
+{
+    int code;
+
+    if (color < 0 || color >= MAXCOLORS) {
+	code = -1;
+    } else {
+	ColorRes *res = &(TScreenOf(xw)->Acolors[color]);
+
+	TRACE(("ChangeAnsiColor for Acolors[%d]\n", color));
+	code = AllocateAnsiColor(xw, res, name);
+    }
+    return code;
+}
+
+/*
+ * Set or query entries in the Acolors[] array by parsing pairs of color/name
+ * values from the given buffer.
+ *
+ * The color can be any legal index into Acolors[], which consists of the
+ * 16/88/256 "ANSI" colors, followed by special color values for the various
+ * colorXX resources.  The indices for the special color values are not
+ * simple to work with, so an alternative is to use the calls which pass in
+ * 'first' set to the beginning of those indices.
+ *
+ * If the name is "?", report to the host the current value for the color.
+ */
 static Bool
 ChangeAnsiColorRequest(XtermWidget xw,
 		       char *buf,
+		       int first,
 		       int final)
 {
     char *name;
     int color;
     int repaint = False;
     int code;
+    int last = (MAXCOLORS - first);
 
     TRACE(("ChangeAnsiColorRequest string='%s'\n", buf));
 
@@ -1979,18 +1999,17 @@ ChangeAnsiColorRequest(XtermWidget xw,
 	*name = '\0';
 	name++;
 	color = atoi(buf);
-	if (color < 0 || color >= NUM_ANSI_COLORS)
-	    break;
+	if (color < 0 || color >= last)
+	    break;		/* quit on any error */
 	buf = strchr(name, ';');
 	if (buf) {
 	    *buf = '\0';
 	    buf++;
 	}
-	if (!strcmp(name, "?"))
-	    ReportAnsiColorRequest(xw, color, final);
-	else {
-	    TRACE(("ChangeAnsiColor for Acolors[%d]\n", color));
-	    code = AllocateAnsiColor(xw, &(xw->screen.Acolors[color]), name);
+	if (!strcmp(name, "?")) {
+	    ReportAnsiColorRequest(xw, color + first, final);
+	} else {
+	    code = ChangeOneAnsiColor(xw, color + first, name);
 	    if (code < 0) {
 		/* stop on any error */
 		break;
@@ -2002,10 +2021,65 @@ ChangeAnsiColorRequest(XtermWidget xw,
 	     */
 	}
     }
-    if (repaint)
-	xtermRepaint(xw);
 
     return (repaint);
+}
+
+static Bool
+ResetOneAnsiColor(XtermWidget xw, int color, int start)
+{
+    Bool repaint = False;
+    int last = MAXCOLORS - start;
+
+    if (color >= 0 && color < last) {
+	ColorRes *res = &(TScreenOf(xw)->Acolors[color + start]);
+
+	if (res->mode) {
+	    /* a color has been allocated for this slot - test further... */
+	    if (ChangeOneAnsiColor(xw, color + start, res->resource) > 0) {
+		repaint = True;
+	    }
+	}
+    }
+    return repaint;
+}
+
+int
+ResetAnsiColorRequest(XtermWidget xw, char *buf, int start)
+{
+    int repaint = 0;
+    int color;
+
+    TRACE(("ResetAnsiColorRequest(%s)\n", buf));
+    if (*buf != '\0') {
+	/* reset specific colors */
+	while ((buf != 0) && (*buf != '\0')) {
+	    char *next;
+
+	    color = strtol(buf, &next, 10);
+	    if (next == buf)
+		break;		/* no number at all */
+	    if (next != 0) {
+		if (strchr(";", *next) == 0)
+		    break;	/* unexpected delimiter */
+		++next;
+	    }
+
+	    if (ResetOneAnsiColor(xw, color, start)) {
+		++repaint;
+	    }
+	    buf = next;
+	}
+    } else {
+	TRACE(("...resetting all %d colors\n", MAXCOLORS));
+	for (color = 0; color < MAXCOLORS; ++color) {
+	    if (ResetOneAnsiColor(xw, color, start)) {
+		++repaint;
+	    }
+	}
+    }
+    TRACE(("...ResetAnsiColorRequest ->%d\n", repaint));
+    return repaint;
 }
 #else
 #define find_closest_color(display, cmap, def) 0
@@ -2018,7 +2092,7 @@ ManipulateSelectionData(XtermWidget xw, TScreen * screen, char *buf, int final)
 #define PDATA(a,b) { a, #b }
     static struct {
 	char given;
-	char *result;
+	String result;
     } table[] = {
 	PDATA('s', SELECT),
 	    PDATA('p', PRIMARY),
@@ -2036,7 +2110,7 @@ ManipulateSelectionData(XtermWidget xw, TScreen * screen, char *buf, int final)
     const char *base = buf;
     char *used = x_strdup(base);
     Cardinal j, n = 0;
-    char **select_args = 0;
+    String *select_args = 0;
 
     TRACE(("Manipulate selection data\n"));
 
@@ -2096,9 +2170,12 @@ ManipulateSelectionData(XtermWidget xw, TScreen * screen, char *buf, int final)
 
 /***====================================================================***/
 
+#define IsSetUtf8Title(xw) (IsTitleMode(xw, tmSetUtf8) || (xw->screen.utf8_title))
+
 static Bool
-xtermIsPrintable(TScreen * screen, Char ** bufp, Char * last)
+xtermIsPrintable(XtermWidget xw, Char ** bufp, Char * last)
 {
+    TScreen *screen = TScreenOf(xw);
     Bool result = False;
     Char *cp = *bufp;
     Char *next = cp;
@@ -2107,7 +2184,7 @@ xtermIsPrintable(TScreen * screen, Char ** bufp, Char * last)
     (void) last;
 
 #if OPT_WIDE_CHARS
-    if (xtermEnvUTF8() && screen->utf8_title) {
+    if (xtermEnvUTF8() && IsSetUtf8Title(xw)) {
 	PtyData data;
 
 	if (decodeUtf8(fakePtyData(&data, cp, last))) {
@@ -2141,7 +2218,7 @@ xtermIsPrintable(TScreen * screen, Char ** bufp, Char * last)
 
 /*
  * Enum corresponding to the actual OSC codes rather than the internal
- * array indices.
+ * array indices.  Compare with TermColors.
  */
 typedef enum {
     OSC_TEXT_FG = 10
@@ -2164,6 +2241,12 @@ typedef enum {
 #endif
     ,OSC_NCOLORS
 } OscTextColors;
+
+/*
+ * Map codes to OSC controls that can reset colors.
+ */
+#define OSC_RESET 100
+#define OSC_Reset(code) (code) + OSC_RESET
 
 static ScrnColors *pOldColors = NULL;
 
@@ -2241,7 +2324,7 @@ ReportColorRequest(XtermWidget xw, int ndx, int final)
 
     GetOldColors(xw);
     color.pixel = pOldColors->colors[ndx];
-    XQueryColor(xw->screen.display, cmap, &color);
+    XQueryColor(TScreenOf(xw)->display, cmap, &color);
     sprintf(buffer, "%d;rgb:%04x/%04x/%04x", i + 10,
 	    color.red,
 	    color.green,
@@ -2366,16 +2449,59 @@ ChangeColorsRequest(XtermWidget xw,
     return result;
 }
 
+static Bool
+ResetColorsRequest(XtermWidget xw,
+		   int code)
+{
+    Bool result = False;
+    char *thisName;
+    ScrnColors newColors;
+    int ndx;
+
+    TRACE(("ResetColorsRequest code=%d\n", code));
+
+#if OPT_COLOR_RES
+    if (GetOldColors(xw)) {
+	ndx = OscToColorIndex((OscTextColors) (code - OSC_RESET));
+	if (xw->misc.re_verse)
+	    ndx = oppositeColor(ndx);
+
+	thisName = xw->screen.Tcolors[ndx].resource;
+
+	newColors.which = 0;
+	newColors.names[ndx] = NULL;
+
+	if (thisName != 0
+	    && pOldColors->names[ndx] != 0
+	    && strcmp(thisName, pOldColors->names[ndx])) {
+	    AllocateTermColor(xw, &newColors, ndx, thisName);
+
+	    if (newColors.which != 0) {
+		ChangeColors(xw, &newColors);
+		UpdateOldColors(xw, &newColors);
+	    }
+	}
+	result = True;
+    }
+#endif
+    return result;
+}
+
 /***====================================================================***/
 
 void
 do_osc(XtermWidget xw, Char * oscbuf, unsigned len GCC_UNUSED, int final)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int mode;
     Char *cp;
     int state = 0;
     char *buf = 0;
+    char temp[2];
+#if OPT_ISO_COLORS
+    int ansi_colors = 0;
+#endif
+    Bool need_data = True;
 
     TRACE(("do_osc %s\n", oscbuf));
 
@@ -2411,7 +2537,7 @@ do_osc(XtermWidget xw, Char * oscbuf, unsigned len GCC_UNUSED, int final)
 	    state = 3;
 	    /* FALLTHRU */
 	default:
-	    if (!xtermIsPrintable(screen, &cp, oscbuf + len)) {
+	    if (!xtermIsPrintable(xw, &cp, oscbuf + len)) {
 		switch (mode) {
 		case 0:
 		case 1:
@@ -2426,8 +2552,48 @@ do_osc(XtermWidget xw, Char * oscbuf, unsigned len GCC_UNUSED, int final)
 	    }
 	}
     }
+
+    /*
+     * Most OSC controls other than resets require data.  Handle the others as
+     * a special case.
+     */
+    switch (mode) {
+#if OPT_ISO_COLORS
+    case OSC_Reset(4):
+    case OSC_Reset(5):
+    case OSC_Reset(OSC_TEXT_FG):
+    case OSC_Reset(OSC_TEXT_BG):
+    case OSC_Reset(OSC_TEXT_CURSOR):
+    case OSC_Reset(OSC_MOUSE_FG):
+    case OSC_Reset(OSC_MOUSE_BG):
+#if OPT_HIGHLIGHT_COLOR
+    case OSC_Reset(OSC_HIGHLIGHT_BG):
+    case OSC_Reset(OSC_HIGHLIGHT_FG):
+#endif
+#if OPT_TEK4014
+    case OSC_Reset(OSC_TEK_FG):
+    case OSC_Reset(OSC_TEK_BG):
+    case OSC_Reset(OSC_TEK_CURSOR):
+#endif
+	need_data = False;
+	break;
+#endif
+    default:
+	break;
+    }
+
+    /*
+     * Check if we have data when we want, and not when we do not want it.
+     */
     if (buf == 0) {
-	TRACE(("do_osc found no data\n"));
+	if (need_data) {
+	    TRACE(("do_osc found no data\n"));
+	    return;
+	}
+	temp[0] = '\0';
+	buf = temp;
+    } else if (!need_data) {
+	TRACE(("do_osc found found unwanted data\n"));
 	return;
     }
 
@@ -2450,8 +2616,19 @@ do_osc(XtermWidget xw, Char * oscbuf, unsigned len GCC_UNUSED, int final)
 	    ChangeXprop(buf);
 	break;
 #if OPT_ISO_COLORS
+    case 5:
+	ansi_colors = NUM_ANSI_COLORS;
+	/* FALLTHRU */
     case 4:
-	ChangeAnsiColorRequest(xw, buf, final);
+	if (ChangeAnsiColorRequest(xw, buf, ansi_colors, final))
+	    xtermRepaint(xw);
+	break;
+    case OSC_Reset(5):
+	ansi_colors = NUM_ANSI_COLORS;
+	/* FALLTHRU */
+    case OSC_Reset(4):
+	if (ResetAnsiColorRequest(xw, buf, ansi_colors))
+	    xtermRepaint(xw);
 	break;
 #endif
     case OSC_TEXT_FG:
@@ -2461,14 +2638,34 @@ do_osc(XtermWidget xw, Char * oscbuf, unsigned len GCC_UNUSED, int final)
     case OSC_MOUSE_BG:
 #if OPT_HIGHLIGHT_COLOR
     case OSC_HIGHLIGHT_BG:
+    case OSC_HIGHLIGHT_FG:
 #endif
 #if OPT_TEK4014
     case OSC_TEK_FG:
     case OSC_TEK_BG:
     case OSC_TEK_CURSOR:
 #endif
-	if (xw->misc.dynamicColors)
+	if (xw->misc.dynamicColors) {
 	    ChangeColorsRequest(xw, mode, buf, final);
+	}
+	break;
+    case OSC_Reset(OSC_TEXT_FG):
+    case OSC_Reset(OSC_TEXT_BG):
+    case OSC_Reset(OSC_TEXT_CURSOR):
+    case OSC_Reset(OSC_MOUSE_FG):
+    case OSC_Reset(OSC_MOUSE_BG):
+#if OPT_HIGHLIGHT_COLOR
+    case OSC_Reset(OSC_HIGHLIGHT_BG):
+    case OSC_Reset(OSC_HIGHLIGHT_FG):
+#endif
+#if OPT_TEK4014
+    case OSC_Reset(OSC_TEK_FG):
+    case OSC_Reset(OSC_TEK_BG):
+    case OSC_Reset(OSC_TEK_CURSOR):
+#endif
+	if (xw->misc.dynamicColors) {
+	    ResetColorsRequest(xw, mode);
+	}
 	break;
 
     case 30:
@@ -2580,6 +2777,9 @@ do_osc(XtermWidget xw, Char * oscbuf, unsigned len GCC_UNUSED, int final)
 	 * One could write code to send back the display and host names,
 	 * but that could potentially open a fairly nasty security hole.
 	 */
+    default:
+	TRACE(("do_osc - unrecognized code\n"));
+	break;
     }
     unparse_end(xw);
 }
@@ -2601,22 +2801,21 @@ static struct {
  * "real" terminals accept commas in the string definitions).
  */
 static int
-udk_value(char **cp)
+udk_value(const char **cp)
 {
+    int result = -1;
     int c;
 
     for (;;) {
 	if ((c = **cp) != '\0')
 	    *cp = *cp + 1;
 	if (c == ';' || c == '\0')
-	    return -1;
-	if (c >= '0' && c <= '9')
-	    return c - '0';
-	if (c >= 'A' && c <= 'F')
-	    return c - 'A' + 10;
-	if (c >= 'a' && c <= 'f')
-	    return c - 'a' + 10;
+	    break;
+	if ((result = x_hex2int(c)) >= 0)
+	    break;
     }
+
+    return result;
 }
 
 void
@@ -2636,10 +2835,10 @@ reset_decudk(void)
  * Parse the data for DECUDK (user-defined keys).
  */
 static void
-parse_decudk(char *cp)
+parse_decudk(const char *cp)
 {
     while (*cp) {
-	char *base = cp;
+	const char *base = cp;
 	char *str = CastMallocN(char, strlen(cp) + 1);
 	unsigned key = 0;
 	int lo, hi;
@@ -2674,7 +2873,7 @@ parse_decudk(char *cp)
 #define SOFT_HIGH 20
 
 static void
-parse_decdld(ANSI * params, char *string)
+parse_decdld(ANSI * params, const char *string)
 {
     char DscsName[8];
     int len;
@@ -2788,9 +2987,9 @@ parse_decdld(ANSI * params, char *string)
  * interspersing with control characters, but have the string already.
  */
 static void
-parse_ansi_params(ANSI * params, char **string)
+parse_ansi_params(ANSI * params, const char **string)
 {
-    char *cp = *string;
+    const char *cp = *string;
     ParmType nparam = 0;
 
     memset(params, 0, sizeof(*params));
@@ -2820,9 +3019,9 @@ parse_ansi_params(ANSI * params, char **string)
 void
 do_dcs(XtermWidget xw, Char * dcsbuf, size_t dcslen)
 {
-    TScreen *screen = &xw->screen;
+    TScreen *screen = TScreenOf(xw);
     char reply[BUFSIZ];
-    char *cp = (char *) dcsbuf;
+    const char *cp = (const char *) dcsbuf;
     Bool okay;
     ANSI params;
 
@@ -2939,8 +3138,8 @@ do_dcs(XtermWidget xw, Char * dcsbuf, size_t dcslen)
 	    Bool fkey;
 	    unsigned state;
 	    int code;
-	    char *tmp;
-	    char *parsed = ++cp;
+	    const char *tmp;
+	    const char *parsed = ++cp;
 
 	    code = xtermcapKeycode(xw, &parsed, &state, &fkey);
 
@@ -3028,107 +3227,141 @@ ChangeGroup(XtermWidget xw, const char *attribute, char *value)
     static char empty[1];
 
     Arg args[1];
-    char *my_attr = x_strdup(attribute);
-    char *original = (value != 0) ? value : empty;
-    char *name = original;
-    TScreen *screen = TScreenOf(xw);
+    Boolean changed = True;
     Widget w = CURRENT_EMU();
     Widget top = SHELL_OF(w);
-    unsigned limit = strlen(name);
-    Char *c1 = (Char *) original;
-    Char *cp;
 
-    TRACE(("ChangeGroup(attribute=%s, value=%s)\n", my_attr, name));
+    char *my_attr;
+    char *name;
+    unsigned limit;
+    Char *c1;
+    Char *cp;
 
     if (!AllowTitleOps(xw))
 	return;
 
-    /*
-     * Ignore titles that are too long to be plausible requests.
-     */
-    if (limit >= 1024)
-	return;
+    if (value == 0)
+	value = empty;
+    if (IsTitleMode(xw, tmSetBase16)) {
+	const char *temp;
+	char *test;
 
-    for (cp = c1; *cp != 0; ++cp) {
-	Char *c2 = cp;
-	if (!xtermIsPrintable(screen, &cp, c1 + limit)) {
-	    memset(c2, '?', (size_t) (cp + 1 - c2));
-	}
-    }
-
-#if OPT_WIDE_CHARS
-    /*
-     * Title strings are limited to ISO-8859-1, which is consistent with the
-     * printable data in sos_table.  However, if we're running in UTF-8 mode,
-     * it is likely that non-ASCII text in the string will be rejected because
-     * it is not printable in the current locale.  So we convert it to UTF-8,
-     * allowing the X library to convert it back.
-     */
-    if (xtermEnvUTF8() && !screen->utf8_title) {
-	int n;
-
-	for (n = 0; name[n] != '\0'; ++n) {
-	    if (CharOf(name[n]) > 127) {
-		if (converted != 0)
-		    free(converted);
-		if ((converted = TypeMallocN(Char, 1 + (5 * limit))) != 0) {
-		    Char *temp = converted;
-		    while (*name != 0) {
-			temp = convertToUTF8(temp, CharOf(*name));
-			++name;
-		    }
-		    *temp = 0;
-		    name = (char *) converted;
-		    TRACE(("...converted{%s}\n", name));
-		}
+	value = x_decode_hex(value, &temp);
+	if (*temp != '\0')
+	    return;
+	for (test = value; *test != '\0'; ++test) {
+	    if (CharOf(*test) < 32) {
+		*test = '\0';
 		break;
 	    }
 	}
     }
+
+    c1 = (Char *) value;
+    name = value;
+    limit = strlen(name);
+    my_attr = x_strdup(attribute);
+
+    TRACE(("ChangeGroup(attribute=%s, value=%s)\n", my_attr, name));
+
+    /*
+     * Ignore titles that are too long to be plausible requests.
+     */
+    if (limit > 0 && limit < 1024) {
+
+	/*
+	 * After all decoding, overwrite nonprintable characters with '?'.
+	 */
+	for (cp = c1; *cp != 0; ++cp) {
+	    Char *c2 = cp;
+	    if (!xtermIsPrintable(xw, &cp, c1 + limit)) {
+		memset(c2, '?', (size_t) (cp + 1 - c2));
+	    }
+	}
+
+#if OPT_WIDE_CHARS
+	/*
+	 * If we're running in UTF-8 mode, and have not been told that the
+	 * title string is in UTF-8, it is likely that non-ASCII text in the
+	 * string will be rejected because it is not printable in the current
+	 * locale.  So we convert it to UTF-8, allowing the X library to
+	 * convert it back.
+	 */
+	if (xtermEnvUTF8() && !IsSetUtf8Title(xw)) {
+	    int n;
+
+	    for (n = 0; name[n] != '\0'; ++n) {
+		if (CharOf(name[n]) > 127) {
+		    if (converted != 0)
+			free(converted);
+		    if ((converted = TypeMallocN(Char, 1 + (5 * limit))) != 0) {
+			Char *temp = converted;
+			while (*name != 0) {
+			    temp = convertToUTF8(temp, CharOf(*name));
+			    ++name;
+			}
+			*temp = 0;
+			name = (char *) converted;
+			TRACE(("...converted{%s}\n", name));
+		    }
+		    break;
+		}
+	    }
+	}
 #endif
 
 #if OPT_SAME_NAME
-    /* If the attribute isn't going to change, then don't bother... */
+	/* If the attribute isn't going to change, then don't bother... */
 
-    if (resource.sameName) {
-	char *buf;
-	XtSetArg(args[0], my_attr, &buf);
-	XtGetValues(top, args, 1);
-	TRACE(("...comparing{%s}\n", buf));
-	if (strcmp(name, buf) == 0)
-	    return;
-    }
+	if (resource.sameName) {
+	    char *buf;
+	    XtSetArg(args[0], my_attr, &buf);
+	    XtGetValues(top, args, 1);
+	    TRACE(("...comparing{%s}\n", buf));
+	    if (strcmp(name, buf) == 0)
+		changed = False;
+	}
 #endif /* OPT_SAME_NAME */
 
-    TRACE(("...updating %s\n", my_attr));
-    TRACE(("...value is %s\n", name));
-    XtSetArg(args[0], my_attr, name);
-    XtSetValues(top, args, 1);
+	if (changed) {
+	    TRACE(("...updating %s\n", my_attr));
+	    TRACE(("...value is %s\n", name));
+	    XtSetArg(args[0], my_attr, name);
+	    XtSetValues(top, args, 1);
 
 #if OPT_WIDE_CHARS
-    if (xtermEnvUTF8()) {
-	Display *dpy = XtDisplay(xw);
-	Atom my_atom;
+	    if (xtermEnvUTF8()) {
+		Display *dpy = XtDisplay(xw);
+		Atom my_atom;
 
-	const char *propname = (!strcmp(my_attr, XtNtitle)
-				? "_NET_WM_NAME"
-				: "_NET_WM_ICON_NAME");
-	if ((my_atom = XInternAtom(dpy, propname, False)) != None) {
-	    if (screen->utf8_title) {	/* FIXME - redundant? */
-		TRACE(("...updating %s\n", propname));
-		TRACE(("...value is %s\n", original));
-		XChangeProperty(dpy, VShellWindow,
-				my_atom, XA_UTF8_STRING(dpy), 8,
-				PropModeReplace,
-				(Char *) original, (int) strlen(original));
-	    } else {
-		TRACE(("...deleting %s\n", propname));
-		XDeleteProperty(dpy, VShellWindow, my_atom);
+		const char *propname = (!strcmp(my_attr, XtNtitle)
+					? "_NET_WM_NAME"
+					: "_NET_WM_ICON_NAME");
+		if ((my_atom = XInternAtom(dpy, propname, False)) != None) {
+		    if (IsSetUtf8Title(xw)) {
+			TRACE(("...updating %s\n", propname));
+			TRACE(("...value is %s\n", value));
+			XChangeProperty(dpy, VShellWindow, my_atom,
+					XA_UTF8_STRING(dpy), 8,
+					PropModeReplace,
+					(Char *) value,
+					(int) strlen(value));
+		    } else {
+			TRACE(("...deleting %s\n", propname));
+			XDeleteProperty(dpy, VShellWindow, my_atom);
+		    }
+		}
 	    }
-	}
-    }
 #endif
-    free(my_attr);
+	}
+
+	free(my_attr);
+
+	if (IsTitleMode(xw, tmSetBase16))
+	    free(value);
+
+    }
+    return;
 }
 
 void
@@ -3139,7 +3372,7 @@ ChangeIconName(XtermWidget xw, char *name)
 	name = dummy;
     }
 #if OPT_ZICONBEEP		/* If warning should be given then give it */
-    if (resource.zIconBeep && xw->screen.zIconBeep_flagged) {
+    if (resource.zIconBeep && TScreenOf(xw)->zIconBeep_flagged) {
 	char *newname = CastMallocN(char, strlen(name) + 4);
 	if (!newname) {
 	    fprintf(stderr, "malloc failed in ChangeIconName\n");
@@ -3235,7 +3468,7 @@ AllocateTermColor(XtermWidget xw,
 		  const char *name)
 {
     XColor def;
-    TScreen *screen = &xw->screen;
+    TScreen *screen = TScreenOf(xw);
     Colormap cmap = xw->core.colormap;
     char *newName;
 
@@ -3670,7 +3903,7 @@ void
 end_tek_mode(void)
 {
     if (TEK4014_ACTIVE(term)) {
-	FlushLog(&(term->screen));
+	FlushLog(TScreenOf(term));
 	longjmp(Tekend, 1);
     }
     return;
@@ -3680,7 +3913,7 @@ void
 end_vt_mode(void)
 {
     if (!TEK4014_ACTIVE(term)) {
-	FlushLog(&(term->screen));
+	FlushLog(TScreenOf(term));
 	TEK4014_ACTIVE(term) = True;
 	longjmp(VTend, 1);
     }

@@ -1,4 +1,4 @@
-/* $XTermId: util.c,v 1.510 2009/11/09 10:09:58 tom Exp $ */
+/* $XTermId: util.c,v 1.520 2009/11/28 16:18:22 tom Exp $ */
 
 /*
  * Copyright 1999-2008,2009 by Thomas E. Dickey
@@ -166,7 +166,7 @@ DamagedCurCells(TScreen * screen, unsigned n, int *klp, int *krp)
 void
 FlushScroll(XtermWidget xw)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int i;
     int shift = INX2ROW(screen, 0);
     int bot = screen->max_row - shift;
@@ -252,7 +252,7 @@ FlushScroll(XtermWidget xw)
 int
 AddToRefresh(XtermWidget xw)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int amount = screen->refresh_amt;
     int row = screen->cur_row;
     int result;
@@ -298,7 +298,7 @@ AddToRefresh(XtermWidget xw)
 static Bool
 AddToVisible(XtermWidget xw)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     Bool result = False;
 
     if (INX2ROW(screen, screen->cur_row) <= screen->max_row) {
@@ -317,7 +317,7 @@ AddToVisible(XtermWidget xw)
 static void
 adjustHiliteOnFwdScroll(XtermWidget xw, int amount, Bool all_lines)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int lo_row = (all_lines
 		  ? (screen->bot_marg - screen->savelines)
 		  : screen->top_marg);
@@ -377,7 +377,7 @@ adjustHiliteOnFwdScroll(XtermWidget xw, int amount, Bool all_lines)
 static void
 adjustHiliteOnBakScroll(XtermWidget xw, int amount)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int lo_row = screen->top_marg;
     int hi_row = screen->bot_marg;
 
@@ -436,7 +436,7 @@ adjustHiliteOnBakScroll(XtermWidget xw, int amount)
 void
 xtermScroll(XtermWidget xw, int amount)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int i = screen->bot_marg - screen->top_marg + 1;
     int shift;
     int bot;
@@ -572,7 +572,7 @@ xtermScroll(XtermWidget xw, int amount)
 void
 RevScroll(XtermWidget xw, int amount)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int i = screen->bot_marg - screen->top_marg + 1;
     int shift;
     int bot;
@@ -656,8 +656,9 @@ RevScroll(XtermWidget xw, int amount)
 void
 WriteText(XtermWidget xw, IChar * str, Cardinal len)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     LineData *ld = 0;
+    int fg;
     unsigned test;
     unsigned flags = xw->flags;
     CellColor fg_bg = makeColorPair(xw->cur_foreground, xw->cur_background);
@@ -711,7 +712,8 @@ WriteText(XtermWidget xw, IChar * str, Cardinal len)
 	       screen->cur_row));
 
 	test = flags;
-	checkVeryBoldColors(test, xw->cur_foreground);
+	fg = MapToColorMode(xw->cur_foreground, screen, flags);
+	checkVeryBoldColors(test, fg);
 
 	/* make sure that the correct GC is current */
 	currentGC = updatedXtermGC(xw, flags, fg_bg, False);
@@ -759,7 +761,7 @@ WriteText(XtermWidget xw, IChar * str, Cardinal len)
 void
 InsertLine(XtermWidget xw, int n)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int i;
     int shift;
     int bot;
@@ -837,7 +839,7 @@ InsertLine(XtermWidget xw, int n)
 void
 DeleteLine(XtermWidget xw, int n)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int i;
     int shift;
     int bot;
@@ -949,7 +951,7 @@ DeleteLine(XtermWidget xw, int n)
 void
 InsertChar(XtermWidget xw, unsigned n)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     LineData *ld;
     unsigned limit;
     int row = INX2ROW(screen, screen->cur_row);
@@ -1027,7 +1029,7 @@ InsertChar(XtermWidget xw, unsigned n)
 void
 DeleteChar(XtermWidget xw, unsigned n)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     LineData *ld;
     unsigned limit;
     int row = INX2ROW(screen, screen->cur_row);
@@ -1093,7 +1095,7 @@ DeleteChar(XtermWidget xw, unsigned n)
 static void
 ClearAbove(XtermWidget xw)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
 
     if (screen->protected_mode != OFF_PROTECT) {
 	int row;
@@ -1132,7 +1134,7 @@ ClearAbove(XtermWidget xw)
 static void
 ClearBelow(XtermWidget xw)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
 
     ClearRight(xw, -1);
 
@@ -1169,7 +1171,7 @@ ClearBelow(XtermWidget xw)
 static int
 ClearInLine2(XtermWidget xw, int flags, int row, int col, unsigned len)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     LineData *ld;
     int rc = 1;
 
@@ -1224,8 +1226,9 @@ ClearInLine2(XtermWidget xw, int flags, int row, int col, unsigned len)
 	} while (!done);
 
 	screen->protected_mode = saved_mode;
-	if (len <= 0)
+	if (len <= 0) {
 	    return 0;
+	}
     }
     /* fall through to the final non-protected segment */
 
@@ -1253,7 +1256,7 @@ ClearInLine2(XtermWidget xw, int flags, int row, int col, unsigned len)
 int
 ClearInLine(XtermWidget xw, int row, int col, unsigned len)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int flags = 0;
 
     /*
@@ -1275,7 +1278,7 @@ ClearInLine(XtermWidget xw, int row, int col, unsigned len)
 void
 ClearRight(XtermWidget xw, int n)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     LineData *ld;
     unsigned len = (unsigned) (MaxCols(screen) - screen->cur_col);
 
@@ -1325,7 +1328,7 @@ ClearRight(XtermWidget xw, int n)
 static void
 ClearLeft(XtermWidget xw)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     unsigned len = (unsigned) screen->cur_col + 1;
 
     assert(screen->cur_col >= 0);
@@ -1350,7 +1353,7 @@ ClearLeft(XtermWidget xw)
 static void
 ClearLine(XtermWidget xw)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     unsigned len = (unsigned) MaxCols(screen);
 
     assert(screen->max_col >= 0);
@@ -1360,7 +1363,7 @@ ClearLine(XtermWidget xw)
 void
 ClearScreen(XtermWidget xw)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int top;
 
     if (screen->cursor_state)
@@ -1389,7 +1392,7 @@ ClearScreen(XtermWidget xw)
 void
 do_erase_line(XtermWidget xw, int param, int mode)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int saved_mode = screen->protected_mode;
 
     if (saved_mode == DEC_PROTECT
@@ -1421,7 +1424,7 @@ do_erase_line(XtermWidget xw, int param, int mode)
 void
 do_erase_display(XtermWidget xw, int param, int mode)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int saved_mode = screen->protected_mode;
 
     if (saved_mode == DEC_PROTECT
@@ -1484,7 +1487,7 @@ do_erase_display(XtermWidget xw, int param, int mode)
 static void
 CopyWait(XtermWidget xw)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     XEvent reply;
     XEvent *rep = &reply;
 
@@ -1532,7 +1535,7 @@ copy_area(XtermWidget xw,
 	  int dest_x,
 	  int dest_y)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
 
     if (width != 0 && height != 0) {
 	/* wait for previous CopyArea to complete unless
@@ -1565,7 +1568,7 @@ horizontal_copy_area(XtermWidget xw,
 		     int nchars,
 		     int amount)	/* number of characters to move right */
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     LineData *ld;
 
     if ((ld = getLineData(screen, screen->cur_row)) != 0) {
@@ -1588,7 +1591,7 @@ vertical_copy_area(XtermWidget xw,
 		   int nlines,
 		   int amount)	/* number of lines to move up (neg=down) */
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
 
     if (nlines > 0) {
 	int src_x = OriginX(screen);
@@ -1623,7 +1626,7 @@ scrolling_copy_area(XtermWidget xw,
 int
 HandleExposure(XtermWidget xw, XEvent * event)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     XExposeEvent *reply = (XExposeEvent *) event;
 
 #ifndef NO_ACTIVE_ICON
@@ -1679,7 +1682,7 @@ HandleExposure(XtermWidget xw, XEvent * event)
 static void
 set_background(XtermWidget xw, int color GCC_UNUSED)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     Pixel c = getXtermBackground(xw, xw->flags, color);
 
     TRACE(("set_background(%d) %#lx\n", color, c));
@@ -1699,7 +1702,7 @@ handle_translated_exposure(XtermWidget xw,
 			   int rect_width,
 			   int rect_height)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int toprow, leftcol, nrows, ncols;
     int x0, x1;
     int y0, y1;
@@ -1765,7 +1768,7 @@ handle_translated_exposure(XtermWidget xw,
 void
 GetColors(XtermWidget xw, ScrnColors * pColors)
 {
-    TScreen *screen = &xw->screen;
+    TScreen *screen = TScreenOf(xw);
     int n;
 
     pColors->which = 0;
@@ -1778,7 +1781,7 @@ void
 ChangeColors(XtermWidget xw, ScrnColors * pNew)
 {
     Bool repaint = False;
-    TScreen *screen = &xw->screen;
+    TScreen *screen = TScreenOf(xw);
     VTwin *win = WhichVWin(screen);
 
     TRACE(("ChangeColors\n"));
@@ -1853,7 +1856,7 @@ ChangeColors(XtermWidget xw, ScrnColors * pNew)
 	}
 #if OPT_TEK4014
 	if (TEK4014_SHOWN(xw)) {
-	    TekScreen *tekscr = &(tekWidget->screen);
+	    TekScreen *tekscr = TekScreenOf(tekWidget);
 	    Window tekwin = TWindow(tekscr);
 	    if (tekwin) {
 		recolor_cursor(screen,
@@ -1890,7 +1893,7 @@ ChangeColors(XtermWidget xw, ScrnColors * pNew)
 void
 xtermClear(XtermWidget xw)
 {
-    TScreen *screen = &xw->screen;
+    TScreen *screen = TScreenOf(xw);
 
     TRACE(("xtermClear\n"));
     XClearWindow(screen->display, VWindow(screen));
@@ -1899,7 +1902,7 @@ xtermClear(XtermWidget xw)
 void
 xtermRepaint(XtermWidget xw)
 {
-    TScreen *screen = &xw->screen;
+    TScreen *screen = TScreenOf(xw);
 
     TRACE(("xtermRepaint\n"));
     xtermClear(xw);
@@ -2028,7 +2031,7 @@ swapVTwinGCs(XtermWidget xw, VTwin * win)
 void
 ReverseVideo(XtermWidget xw)
 {
-    TScreen *screen = &xw->screen;
+    TScreen *screen = TScreenOf(xw);
     ToSwap listToSwap[5];
     int numToSwap = 0;
 
@@ -2071,7 +2074,7 @@ ReverseVideo(XtermWidget xw)
     }
 #if OPT_TEK4014
     if (TEK4014_SHOWN(xw)) {
-	TekScreen *tekscr = &(tekWidget->screen);
+	TekScreen *tekscr = TekScreenOf(tekWidget);
 	Window tekwin = TWindow(tekscr);
 	recolor_cursor(screen,
 		       tekscr->arrow,
@@ -2151,7 +2154,7 @@ getXftColor(XtermWidget xw, Pixel pixel)
     }
     i = oldest;
     color.pixel = pixel;
-    XQueryColor(xw->screen.display, xw->core.colormap, &color);
+    XQueryColor(TScreenOf(xw)->display, xw->core.colormap, &color);
     cache[i].color.color.red = color.red;
     cache[i].color.color.green = color.green;
     cache[i].color.color.blue = color.blue;
@@ -2174,7 +2177,7 @@ getXftColor(XtermWidget xw, Pixel pixel)
 	  ? 0 \
 	  : (((ch) < 256) \
 	      ? (((ch) >= 128 && (ch) < 160) \
-	          ? ((xw)->screen.c1_printable ? 1 : 0) \
+	          ? (TScreenOf(xw)->c1_printable ? 1 : 0) \
 	          : 1) \
 	      : my_wcwidth(ch)))
 #else
@@ -2211,7 +2214,7 @@ xtermXftDrawString(XtermWidget xw,
 		   Cardinal len,
 		   Bool really)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int ncells = 0;
 
     if (len != 0) {
@@ -2228,12 +2231,14 @@ xtermXftDrawString(XtermWidget xw,
 
 #if OPT_ISO_COLORS
 	if ((flags & UNDERLINE)
+	    && !screen->colorULMode
 	    && screen->italicULMode
 	    && XFT_FONT(renderWideItal[fontnum])) {
 	    wfont = XFT_FONT(renderWideItal[fontnum]);
 	} else
 #endif
 	    if ((flags & BOLDATTR(screen))
+		&& !screen->colorBDMode
 		&& XFT_FONT(renderWideBold[fontnum])) {
 	    wfont = XFT_FONT(renderWideBold[fontnum]);
 	} else {
@@ -2362,7 +2367,7 @@ ucs_workaround(XtermWidget xw,
 	       int chrset,
 	       int on_wide)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int fixed = False;
 
     if (screen->wide_chars && screen->utf8_mode && ch > 256) {
@@ -2411,7 +2416,7 @@ xtermFillCells(XtermWidget xw,
 	       int y,
 	       Cardinal len)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     VTwin *currentWin = WhichVWin(screen);
 
     if (!(flags & NOBACKGROUND)) {
@@ -2498,7 +2503,7 @@ xtermSetClipRectangles(Display * dpy,
 		       int order)
 {
 #if 0
-    TScreen *screen = &(term->screen);
+    TScreen *screen = TScreenOf(term);
     Drawable draw = VWindow(screen);
 
     XSetClipMask(dpy, gc, None);
@@ -2583,7 +2588,7 @@ drawClippedXftString(XtermWidget xw,
 			       font, x, y,
 			       text,
 			       len);
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
 
     beginXftClipping(screen, x, y, ncells);
     xtermXftDrawString(xw, flags,
@@ -2621,7 +2626,7 @@ drawXtermText(XtermWidget xw,
 	      Cardinal len,
 	      int on_wide)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     Cardinal real_length = len;
     Cardinal underline_len = 0;
     /* Intended width of the font to draw (as opposed to the actual width of
@@ -2765,6 +2770,7 @@ drawXtermText(XtermWidget xw,
 	}
 #if OPT_ISO_COLORS
 	if ((flags & UNDERLINE)
+	    && !screen->colorULMode
 	    && screen->italicULMode
 	    && XFT_FONT(renderFontItal[fontnum])) {
 	    font = XFT_FONT(renderFontItal[fontnum]);
@@ -2772,6 +2778,9 @@ drawXtermText(XtermWidget xw,
 	} else
 #endif
 	    if ((flags & BOLDATTR(screen))
+#if OPT_ISO_COLORS
+		&& !screen->colorBDMode
+#endif
 		&& XFT_FONT(renderFontBold[fontnum])) {
 	    font = XFT_FONT(renderFontBold[fontnum]);
 	} else {
@@ -3039,7 +3048,7 @@ drawXtermText(XtermWidget xw,
 		if (!isMissing
 		    && ch > 255
 		    && ucs2dec(ch) < 32
-		    && xw->screen.force_box_chars) {
+		    && TScreenOf(xw)->force_box_chars) {
 		    ch = ucs2dec(ch);
 		    isMissing = True;
 		}
@@ -3308,7 +3317,7 @@ allocXtermChars(ScrnPtr * buffer, Cardinal length)
 void
 xtermSizeHints(XtermWidget xw, int scrollbarWidth)
 {
-    TScreen *screen = &xw->screen;
+    TScreen *screen = TScreenOf(xw);
 
     TRACE(("xtermSizeHints\n"));
     TRACE(("   border    %d\n", xw->core.border_width));
@@ -3341,7 +3350,7 @@ xtermSizeHints(XtermWidget xw, int scrollbarWidth)
 void
 getXtermSizeHints(XtermWidget xw)
 {
-    TScreen *screen = &xw->screen;
+    TScreen *screen = TScreenOf(xw);
     long supp;
 
     if (!XGetWMNormalHints(screen->display, XtWindow(SHELL_OF(xw)),
@@ -3358,7 +3367,7 @@ getXtermSizeHints(XtermWidget xw)
 GC
 updatedXtermGC(XtermWidget xw, unsigned flags, CellColor fg_bg, Bool hilite)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     VTwin *win = WhichVWin(screen);
     CgsEnum cgsId = gcMAX;
     unsigned my_fg = extract_fg(xw, fg_bg, flags);
@@ -3380,6 +3389,9 @@ updatedXtermGC(XtermWidget xw, unsigned flags, CellColor fg_bg, Bool hilite)
     (void) my_bg;
     (void) my_fg;
 
+    /*
+     * Discard video attributes overridden by colorXXXMode's.
+     */
     checkVeryBoldColors(flags, my_fg);
 
     if (ReverseOrHilite(screen, flags, hilite)) {
@@ -3454,7 +3466,7 @@ updatedXtermGC(XtermWidget xw, unsigned flags, CellColor fg_bg, Bool hilite)
 void
 resetXtermGC(XtermWidget xw, unsigned flags, Bool hilite)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     VTwin *win = WhichVWin(screen);
     CgsEnum cgsId = gcMAX;
     Pixel fg_pix = getXtermForeground(xw, flags, xw->cur_foreground);
@@ -3494,14 +3506,9 @@ extract_fg(XtermWidget xw, CellColor color, unsigned flags)
 {
     unsigned fg = ExtractForeground(color);
 
-    if (xw->screen.colorAttrMode
+    if (TScreenOf(xw)->colorAttrMode
 	|| (fg == ExtractBackground(color))) {
-	if (xw->screen.colorULMode && (flags & UNDERLINE))
-	    fg = COLOR_UL;
-	if (xw->screen.colorBDMode && (flags & BOLD))
-	    fg = COLOR_BD;
-	if (xw->screen.colorBLMode && (flags & BLINK))
-	    fg = COLOR_BL;
+	fg = MapToColorMode(fg, TScreenOf(xw), flags);
     }
     return fg;
 }
@@ -3515,9 +3522,9 @@ extract_bg(XtermWidget xw, CellColor color, unsigned flags)
 {
     unsigned bg = ExtractBackground(color);
 
-    if (xw->screen.colorAttrMode
+    if (TScreenOf(xw)->colorAttrMode
 	|| (bg == ExtractForeground(color))) {
-	if (xw->screen.colorRVMode && (flags & INVERSE))
+	if (TScreenOf(xw)->colorRVMode && (flags & INVERSE))
 	    bg = COLOR_RV;
     }
     return bg;
@@ -3551,7 +3558,7 @@ ClearCurBackground(XtermWidget xw,
 		   unsigned height,
 		   unsigned width)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
 
     TRACE(("ClearCurBackground(%d,%d,%d,%d) %d\n",
 	   top, left, height, width, xw->cur_background));

@@ -1,4 +1,4 @@
-/* $XTermId: ptydata.c,v 1.90 2009/08/09 17:22:05 tom Exp $ */
+/* $XTermId: ptydata.c,v 1.91 2009/11/28 14:13:48 tom Exp $ */
 
 /************************************************************
 
@@ -240,7 +240,7 @@ readPtyData(TScreen * screen, PtySelect * select_mask, PtyData * data)
 #endif
 	data->last += size;
 #ifdef ALLOWLOGGING
-	term->screen.logstart = VTbuffer->next;
+	TScreenOf(term)->logstart = VTbuffer->next;
 #endif
     }
 

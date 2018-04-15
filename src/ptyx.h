@@ -1,4 +1,4 @@
-/* $XTermId: ptyx.h,v 1.637 2009/11/10 00:06:24 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.649 2009/12/06 18:21:13 tom Exp $ */
 
 /*
  * Copyright 1999-2008,2009 by Thomas E. Dickey
@@ -298,6 +298,15 @@ typedef unsigned char Char;		/* to support 8 bit chars */
 typedef Char *ScrnPtr;
 typedef ScrnPtr *ScrnBuf;
 
+/*
+ * Declare an X String, but for unsigned chars.
+ */
+#ifdef _CONST_X_STRING
+typedef const Char *UString;
+#else
+typedef Char *UString;
+#endif
+
 #define CharOf(n) ((unsigned char)(n))
 
 typedef struct {
@@ -355,8 +364,8 @@ typedef struct {
 #define	NPARAM	30			/* Max. parameters		*/
 
 typedef struct {
-	char *opt;
-	char *desc;
+	String opt;
+	String desc;
 } OptionHelp;
 
 typedef short ParmType;
@@ -794,7 +803,10 @@ typedef enum {
 #define for_each_curs_gc(n) for (n = gcVTcursNormal; n <= gcVTcursOutline; ++n)
 #define for_each_gc(n)      for (n = gcNorm; n < gcMAX; ++n)
 
-/* indices for the normal terminal colors in screen.Tcolors[] */
+/*
+ * Indices for the normal terminal colors in screen.Tcolors[].
+ * See also OscTextColors, which has corresponding values.
+ */
 typedef enum {
     TEXT_FG = 0			/* text foreground */
     , TEXT_BG			/* text background */
@@ -812,6 +824,20 @@ typedef enum {
 #endif
     , NCOLORS			/* total number of colors */
 } TermColors;
+
+/*
+ * Constants for titleModes resource
+ */
+typedef enum {
+    tmSetBase16 = 1		/* set title using hex-string */
+    , tmGetBase16 = 2		/* get title using hex-string */
+#if OPT_WIDE_CHARS
+    , tmSetUtf8 = 4		/* like utf8Title, but controllable */
+    , tmGetUtf8 = 8		/* retrieve title encoded as UTF-8 */
+#endif
+} TitleModes;
+
+#define IsTitleMode(xw,mode) (((xw)->screen.title_modes & mode) != 0)
 
 /* indices for mapping multiple clicks to selection types */
 typedef enum {
@@ -1335,11 +1361,19 @@ typedef enum {
 typedef struct {
 	String		resource;
 	Pixel		value;
-	int		mode;
+	int		mode;		/* -1=invalid, 0=unset, 1=set   */
 } ColorRes;
 #else
 #define ColorRes Pixel
 #endif
+
+/* these are set in getPrinterFlags */
+typedef struct {
+	int	printer_extent;		/* print complete page		*/
+	int	printer_formfeed;	/* print formfeed per function	*/
+	int	printer_newline;	/* print newline per function	*/
+	int	print_attributes;	/* 0=off, 1=normal, 2=color	*/
+} PrinterFlags;
 
 typedef struct {
 	unsigned	which;		/* must have NCOLORS bits */
@@ -1575,8 +1609,11 @@ typedef struct {
 	Boolean printer_autoclose;	/* close printer when offline	*/
 	Boolean printer_extent;		/* print complete page		*/
 	Boolean printer_formfeed;	/* print formfeed per function	*/
+	Boolean printer_newline;	/* print newline per function	*/
 	int	printer_controlmode;	/* 0=off, 1=auto, 2=controller	*/
 	int	print_attributes;	/* 0=off, 1=normal, 2=color	*/
+
+	PrinterFlags	printer_flags;	/* working copy of printer flags */
 
 	Boolean		fnt_prop;	/* true if proportional fonts	*/
 	Boolean		fnt_boxes;	/* true if font has box-chars	*/
@@ -1693,6 +1730,7 @@ typedef struct {
 	SavedCursor	sc[SAVED_CURSORS]; /* data for restore cursor	*/
 	unsigned 	save_modes[DP_LAST]; /* save dec/xterm private modes */
 
+	int		title_modes;	/* control set/get of titles	*/
 	SaveTitle	*save_title;
 
 	/* Improved VT100 emulation stuff.				*/
@@ -2325,7 +2363,7 @@ typedef struct _TekWidgetRec {
 /*
  * Macro to check if we are iconified; do not use render for that case.
  */
-#define UsingRenderFont(xw)	((xw)->misc.render_font && !IsIcon(&((xw)->screen)))
+#define UsingRenderFont(xw)	((xw)->misc.render_font && !IsIcon(TScreenOf(xw)))
 
 /*
  * These definitions do not depend on whether xterm supports active-icon.
@@ -2366,14 +2404,14 @@ typedef struct _TekWidgetRec {
 #define BorderWidth(w)		((w)->core.border_width)
 #define BorderPixel(w)		((w)->core.border_pixel)
 
-#define AllowXtermOps(w,name)	((w)->screen.name && !(w)->screen.allowSendEvents)
+#define AllowXtermOps(w,name)	(TScreenOf(w)->name && !TScreenOf(w)->allowSendEvents)
 
 #define AllowFontOps(w)		AllowXtermOps(w, allowFontOps)
 #define AllowTcapOps(w)		AllowXtermOps(w, allowTcapOps)
 #define AllowTitleOps(w)	AllowXtermOps(w, allowTitleOps)
 
 #define AllowWindowOps(w,name)	(AllowXtermOps(w, allowWindowOps) || \
-				 !(w)->screen.disallow_win_ops[name])
+				 !TScreenOf(w)->disallow_win_ops[name])
 
 #if OPT_TOOLBAR
 #define ToolbarHeight(w)	((resource.toolBar) \
@@ -2434,6 +2472,10 @@ typedef struct Tek_Link
 
 #ifndef TRACE_CHILD
 #define TRACE_CHILD /*nothing*/
+#endif
+
+#ifndef TRACE_FOCUS
+#define TRACE_FOCUS(w,e) /*nothing*/
 #endif
 
 #ifndef TRACE_HINTS

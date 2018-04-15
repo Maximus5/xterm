@@ -1,4 +1,4 @@
-/* $XTermId: screen.c,v 1.405 2009/11/09 10:01:13 tom Exp $ */
+/* $XTermId: screen.c,v 1.408 2009/11/28 12:38:26 tom Exp $ */
 
 /*
  * Copyright 1999-2008,2009 by Thomas E. Dickey
@@ -453,7 +453,7 @@ Reallocate(XtermWidget xw,
 	if (nrow < oldrow) {
 	    /* Remove lines off the top of the buffer if necessary. */
 	    move_up = (int) (oldrow - nrow)
-		- (xw->screen.max_row - xw->screen.cur_row);
+		- (TScreenOf(xw)->max_row - TScreenOf(xw)->cur_row);
 	    if (move_up < 0)
 		move_up = 0;
 	    /* Overlapping move here! */
@@ -486,7 +486,7 @@ Reallocate(XtermWidget xw,
     if (GravityIsSouthWest(xw)) {
 	if (nrow > oldrow) {
 	    /* move data down to bottom of expanded screen */
-	    move_down = Min((int) (nrow - oldrow), xw->screen.savedlines);
+	    move_down = Min((int) (nrow - oldrow), TScreenOf(xw)->savedlines);
 	}
     }
 
@@ -589,7 +589,7 @@ ReallocateBufOffsets(XtermWidget xw,
 void
 ChangeToWide(XtermWidget xw)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int savelines = screen->scrollWidget ? screen->savelines : 0;
 
     if (screen->wide_chars)
@@ -661,7 +661,7 @@ void
 ClearCells(XtermWidget xw, int flags, unsigned len, int row, int col)
 {
     if (len != 0) {
-	TScreen *screen = &(xw->screen);
+	TScreen *screen = TScreenOf(xw);
 	LineData *ld;
 	unsigned n;
 
@@ -697,7 +697,7 @@ void
 ScrnClearCells(XtermWidget xw, int row, int col, unsigned len)
 {
 #if OPT_WIDE_CHARS
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
 #endif
     int flags = 0;
 
@@ -720,8 +720,8 @@ ScrnClearCells(XtermWidget xw, int row, int col, unsigned len)
 void
 ScrnDisownSelection(XtermWidget xw)
 {
-    if (ScrnHaveSelection(&(xw->screen))) {
-	if (xw->screen.keepSelection) {
+    if (ScrnHaveSelection(TScreenOf(xw))) {
+	if (TScreenOf(xw)->keepSelection) {
 	    UnhiliteSelection(xw);
 	} else {
 	    DisownSelection(xw);
@@ -740,7 +740,7 @@ ScrnWriteText(XtermWidget xw,
 	      CellColor cur_fg_bg,
 	      unsigned length)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     LineData *ld;
 #if OPT_ISO_COLORS
     CellColor *fb = 0;
@@ -873,7 +873,7 @@ ScrnWriteText(XtermWidget xw,
 static void
 ScrnClearLines(XtermWidget xw, ScrnBuf sb, int where, unsigned n, unsigned size)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     ScrnPtr *base;
     unsigned jump = scrnHeadSize(screen, 1);
     unsigned i;
@@ -1010,7 +1010,7 @@ ScrnPointers(TScreen * screen, size_t len)
 void
 ScrnInsertLine(XtermWidget xw, ScrnBuf sb, int last, int where, unsigned n)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     unsigned size = (unsigned) MaxCols(screen);
 
     TRACE(("ScrnInsertLine(last %d, where %d, n %d, size %d)\n",
@@ -1055,7 +1055,7 @@ ScrnInsertLine(XtermWidget xw, ScrnBuf sb, int last, int where, unsigned n)
 void
 ScrnDeleteLine(XtermWidget xw, ScrnBuf sb, int last, int where, unsigned n)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     unsigned size = (unsigned) MaxCols(screen);
 
     TRACE(("ScrnDeleteLine(%s:last %d, where %d, n %d, size %d)\n",
@@ -1141,7 +1141,7 @@ ScrnInsertChar(XtermWidget xw, unsigned n)
     	for (j = last - 1; j >= (col + (int) n); --j) \
 	    data[j] = data[j - (int) n]
 
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int last = MaxCols(screen);
     int row = screen->cur_row;
     int col = screen->cur_col;
@@ -1202,7 +1202,7 @@ ScrnDeleteChar(XtermWidget xw, unsigned n)
     	for (j = col; j < last - (int) n; ++j) \
 	    data[j] = data[j + (int) n]
 
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int last = MaxCols(screen);
     int row = screen->cur_row;
     int col = screen->cur_col;
@@ -1265,7 +1265,7 @@ ScrnRefresh(XtermWidget xw,
 	    int ncols,
 	    Bool force)		/* ... leading/trailing spaces */
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     LineData *ld;
     int y = toprow * FontHeight(screen) + screen->border;
     int row;
@@ -1627,7 +1627,7 @@ ScrnUpdate(XtermWidget xw,
 	   int ncols,
 	   Bool force)		/* ... leading/trailing spaces */
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
 
     if (ScrnHaveSelection(screen)
 	&& (toprow <= screen->endH.row)
@@ -1646,7 +1646,7 @@ ClearBufRows(XtermWidget xw,
 	     int first,
 	     int last)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     unsigned len = (unsigned) MaxCols(screen);
     int row;
 
@@ -1686,7 +1686,7 @@ ScreenResize(XtermWidget xw,
 	     int height,
 	     unsigned *flags)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     int code, rows, cols;
     int border = 2 * screen->border;
     int move_down_by = 0;
@@ -2144,7 +2144,7 @@ limitedParseCol(XtermWidget xw, TScreen * screen, int col)
 void
 xtermParseRect(XtermWidget xw, int nparams, int *params, XTermRect * target)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
 
     memset(target, 0, sizeof(*target));
     target->top = LimitedParse(0, limitedParseRow, minRectRow(screen));
@@ -2161,7 +2161,7 @@ xtermParseRect(XtermWidget xw, int nparams, int *params, XTermRect * target)
 static Bool
 validRect(XtermWidget xw, XTermRect * target)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
 
     TRACE(("comparing against screensize %dx%d\n",
 	   maxRectRow(screen),
@@ -2186,7 +2186,7 @@ ScrnFillRectangle(XtermWidget xw,
 		  unsigned flags,
 		  Bool keepColors)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
 
     TRACE(("filling rectangle with '%c' flags %#x\n", value, flags));
     if (validRect(xw, target)) {
@@ -2260,7 +2260,7 @@ ScrnFillRectangle(XtermWidget xw,
 void
 ScrnCopyRectangle(XtermWidget xw, XTermRect * source, int nparam, int *params)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
 
     TRACE(("copying rectangle\n"));
 
@@ -2345,7 +2345,7 @@ ScrnMarkRectangle(XtermWidget xw,
 		  int nparam,
 		  int *params)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
     Bool exact = (screen->cur_decsace == 2);
 
     TRACE(("%s %s\n",
@@ -2463,7 +2463,7 @@ void
 ScrnWipeRectangle(XtermWidget xw,
 		  XTermRect * target)
 {
-    TScreen *screen = &(xw->screen);
+    TScreen *screen = TScreenOf(xw);
 
     TRACE(("wiping rectangle\n"));
 
