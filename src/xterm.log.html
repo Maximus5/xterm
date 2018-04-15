@@ -20,7 +20,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF   *
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.            *
  *****************************************************************************
-  $XTermId: xterm.log.html,v 1.772 2009/08/13 01:23:33 tom Exp $
+  $XTermId: xterm.log.html,v 1.781 2009/08/16 22:51:21 tom Exp $
   -->
 <HTML>
 <HEAD>
@@ -45,6 +45,7 @@ Most of these are summarized in the XFree86 CHANGELOG
 is the latest version of this file.
 
 <UL>
+<LI><A HREF="#xterm_246">Patch #246 - 2009/8/16</A>
 <LI><A HREF="#xterm_245">Patch #245 - 2009/8/12</A>
 <LI><A HREF="#xterm_244">Patch #244 - 2009/8/9</A>
 <LI><A HREF="#xterm_243">Patch #243 - 2009/3/28</A>
@@ -293,6 +294,44 @@ is the latest version of this file.
 <LI><A HREF="#xterm_01">Patch #1 - 1996/1/6</A>
 </UL>
 
+<H1><A NAME="xterm_246">Patch #246 - 2009/8/16</A></H1>
+<ul>
+	<li>remove obsolete logic for saving/restoring wrapping flags, which
+	    did not work on 64-bit platform.  Wrapping flags (stored in the
+	    line-index) are now copied with line-data (Debian #541160).
+
+	<li>modify comments in app-defaults files to avoid problem with
+	    C preprocessor used by <code>xrdb</code> (Debian #541603).
+
+	<li>restore special case in <code>makeColorPair</code>,
+	    needed for <code>colorBDMode</code> resource (Debian #541089).
+
+	<li>correct <code>SetLineFlags()</code> macro, broken in
+	    <a href="#xterm_244">patch #244</a>
+	    when recoding to avoid gcc-specific bitfields (Debian #541236).
+
+	<li>modify initialization of screen buffers to ensure that pointers
+	    align to int-boundaries.
+	    This fixes a problem introduced in
+	    <a href="#xterm_244">patch #244</a>
+	    where the color- and character-arrays
+	    (stored after the video-attributes in each row)
+	    might be misaligned (report by Rajeev V Pillai).
+
+	<li>add limit-check in <code>ScrnRefresh</code> for handling
+	    saved-lines from the circular buffer which are repainted on a
+	    screen whose width has increased.  To improve performance, circular
+	    buffer entries are not resized (report by Rajeev V Pillai).
+
+	<li>correct type for <code>CellColor</code> (a late change in
+	    <a href="#xterm_244">patch #244</a>
+	    to avoid gcc-specifc enums made that unsigned
+	    rather than unsigned short, for the 256-color option).
+
+	<li>fix typo in configure option --enable-16bit-chars (report by
+	    Rajeev V. Pillai).
+</ul>
+
 <H1><A NAME="xterm_245">Patch #245 - 2009/8/12</A></H1>
 <ul>
 	<li>correct a special case in saving FIFO-lines from
@@ -359,7 +398,7 @@ is the latest version of this file.
 	    when vt52 support is not compiled (report by Olaf 'Rhialto'
 	    Seibert).
 
-	<li>save/restore line-wrapping flags when converting from ISL-8859-1
+	<li>save/restore line-wrapping flags when converting from ISO-8859-1
 	    encoding to UTF-8 encoding, as well as when resizing screen.
 
 	<li>remove extra adjustment of position in fix for Debian #418324.
