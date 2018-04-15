@@ -1,4 +1,4 @@
-/* $XTermId: misc.c,v 1.544 2011/09/04 18:50:30 tom Exp $ */
+/* $XTermId: misc.c,v 1.548 2011/09/11 20:18:45 tom Exp $ */
 
 /*
  * Copyright 1999-2010,2011 by Thomas E. Dickey
@@ -383,8 +383,8 @@ TraceExposeEvent(XEvent * arg)
 #define ExposeContains(p,q) \
 	    ((p)->y <= (q)->y \
 	  && (p)->x <= (q)->x \
-	  && (p)->height >= (q)->height \
-	  && (p)->width >= (q)->width)
+	  && ((p)->y + (p)->height) >= ((q)->y + (q)->height) \
+	  && ((p)->x + (p)->width) >= ((q)->x + (q)->width))
 
 static XtInputMask
 mergeExposeEvents(XEvent * target)
@@ -1789,9 +1789,6 @@ void
 StartLog(XtermWidget xw)
 {
     static char *log_default;
-#ifdef ALLOWLOGFILEEXEC
-    char *cp;
-#endif /* ALLOWLOGFILEEXEC */
     TScreen *screen = TScreenOf(xw);
 
     if (screen->logging || (screen->inhibit & I_LOG))
@@ -1851,7 +1848,7 @@ StartLog(XtermWidget xw)
 	int pid;
 	int p[2];
 	static char *shell;
-	struct passwd *pw;
+	struct passwd pw;
 
 	if (pipe(p) < 0 || (pid = fork()) < 0)
 	    return;
@@ -1871,14 +1868,19 @@ StartLog(XtermWidget xw)
 	    close(ConnectionNumber(screen->display));
 	    close(screen->respond);
 
-	    if ((((cp = x_getenv("SHELL")) == NULL)
-		 && ((pw = getpwuid(screen->uid)) == NULL
-		     || *(cp = pw->pw_shell) == 0))
-		|| (shell = CastMallocN(char, strlen(cp))) == 0) {
+	    if ((shell = x_getenv("SHELL")) == NULL) {
+
+		if (x_getpwuid(screen->uid, &pw)) {
+		    x_getlogin(screen->uid, &pw);
+		    if (*(pw.pw_shell)) {
+			shell = pw.pw_shell;
+		    }
+		}
+	    }
+
+	    if (shell == 0) {
 		static char dummy[] = "/bin/sh";
 		shell = dummy;
-	    } else {
-		strcpy(shell, cp);
 	    }
 
 	    signal(SIGHUP, SIG_DFL);
@@ -4373,6 +4375,22 @@ xtermFindShell(char *leaf, Bool warning)
 #define ENV_HUNK(n)	(unsigned) ((((n) + 1) | 31) + 1)
 
 /*
+ * If we do not have unsetenv(), make consistent updates for environ[].
+ * This could happen on some older machines due to the uneven standardization
+ * process for the two functions.
+ *
+ * That is, putenv() makes a copy of environ, and some implementations do not
+ * update the environ pointer, so the fallback when unsetenv() is missing would
+ * not work as intended.  Likewise, the reverse could be true, i.e., unsetenv
+ * could copy environ.
+ */
+#if defined(HAVE_PUTENV) && !defined(HAVE_UNSETENV)
+#undef HAVE_PUTENV
+#elif !defined(HAVE_PUTENV) && defined(HAVE_UNSETENV)
+#undef HAVE_UNSETENV
+#endif
+
+/*
  * copy the environment before Setenv'ing.
  */
 void
@@ -4476,14 +4494,17 @@ xtermSetenv(const char *var, const char *value)
 void
 xtermUnsetenv(const char *var)
 {
+    TRACE(("xtermUnsetenv(%s)\n", var));
 #ifdef HAVE_UNSETENV
     unsetenv(var);
 #else
-    int ignore;
-    int item = findEnv(var, &ignore);
-    if (item >= 0) {
-	while ((environ[item] = environ[item + 1]) != 0) {
-	    ++item;
+    {
+	int ignore;
+	int item = findEnv(var, &ignore);
+	if (item >= 0) {
+	    while ((environ[item] = environ[item + 1]) != 0) {
+		++item;
+	    }
 	}
     }
 #endif
@@ -4855,10 +4876,10 @@ sortedOpts(OptionHelp * options, XrmOptionDescRec * descs, Cardinal numDescs)
 /*
  * Report the character-type locale that xterm was started in.
  */
-char *
+String
 xtermEnvLocale(void)
 {
-    static char *result;
+    static String result;
 
     if (result == 0) {
 	if ((result = x_nonempty(setlocale(LC_CTYPE, 0))) == 0) {
