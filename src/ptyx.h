@@ -1,4 +1,4 @@
-/* $XTermId: ptyx.h,v 1.794 2014/03/02 22:38:51 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.802 2014/05/03 12:58:37 tom Exp $ */
 
 /*
  * Copyright 1999-2013,2014 by Thomas E. Dickey
@@ -322,6 +322,7 @@ typedef Char *UString;
 #endif
 
 #define IsEmpty(s) ((s) == 0 || *(s) == '\0')
+#define IsSpace(c) ((c) == ' ' || (c) == '\t' || (c) == '\r' || (c) == '\n')
 
 #define CharOf(n) ((Char)(n))
 
@@ -525,7 +526,15 @@ typedef struct {
 #endif
 
 #ifndef OPT_SIXEL_GRAPHICS
-#define OPT_SIXEL_GRAPHICS 0 /* true if xterm supports VT220-style sixel graphics */
+#define OPT_SIXEL_GRAPHICS 0 /* true if xterm supports VT240-style sixel graphics */
+#endif
+
+#ifndef OPT_REGIS_GRAPHICS
+#define OPT_REGIS_GRAPHICS 0 /* true if xterm supports VT125/VT240/VT330 ReGIS graphics */
+#endif
+
+#ifndef OPT_GRAPHICS
+#define OPT_GRAPHICS 0 /* true if xterm is configured for any type of graphics */
 #endif
 
 #ifndef OPT_DEC_SOFTFONT
@@ -1051,7 +1060,7 @@ typedef enum {
 #if OPT_SUNPC_KBD
     ,srm_VT220_FKEYS = 1061
 #endif
-#if OPT_SIXEL_GRAPHICS
+#if OPT_GRAPHICS
     ,srm_PRIVATE_COLOR_REGISTERS = 1070
 #endif
 #if OPT_READLINE
@@ -1062,6 +1071,9 @@ typedef enum {
     ,srm_PASTE_QUOTE = SET_PASTE_QUOTE
     ,srm_PASTE_LITERAL_NL = SET_PASTE_LITERAL_NL
 #endif				/* OPT_READLINE */
+#if OPT_SIXEL_GRAPHICS
+    ,srm_SIXEL_SCROLLS_RIGHT = 8452
+#endif
 } DECSET_codes;
 
 /* indices for mapping multiple clicks to selection types */
@@ -1452,7 +1464,7 @@ typedef unsigned short CellColor;
 typedef Char CellColor;
 #endif
 #else
-typedef int CellColor;
+typedef unsigned CellColor;
 #endif
 
 #define BITS2MASK(b)          ((1 << b) - 1)
@@ -1643,6 +1655,9 @@ typedef enum {
 	DP_TOOLBAR,
 #endif
 	DP_X_PRIVATE_COLOR_REGISTERS,
+#if OPT_SIXEL_GRAPHICS
+	DP_SIXEL_SCROLLS_RIGHT,
+#endif
 	DP_LAST
 } SaveModes;
 
@@ -2179,6 +2194,11 @@ typedef struct {
 
 #if OPT_SIXEL_GRAPHICS
 	Boolean		sixel_scrolling; /* sixel scrolling             */
+	Boolean		sixel_scrolls_right; /* sixel scrolling moves cursor to right */
+#endif
+
+#if OPT_GRAPHICS
+	int		numcolorregisters; /* number of supported color registers */
 	Boolean		privatecolorregisters; /* private color registers for each graphic */
 #endif
 
@@ -2593,6 +2613,15 @@ typedef struct _Misc {
 
 typedef struct _Work {
     int dummy;
+#ifdef SunXK_F36
+#define MAX_UDK 37
+#else
+#define MAX_UDK 35
+#endif
+    struct {
+	char *str;
+	int len;
+    } user_keys[MAX_UDK];
 #ifndef NO_ACTIVE_ICON
     int active_icon;		/* use application icon window  */
 #endif /* NO_ACTIVE_ICON */
@@ -2613,6 +2642,11 @@ typedef struct _Work {
 #if OPT_RENDERFONT
     Boolean render_font;
 #endif
+#if OPT_DABBREV
+#define MAX_DABBREV	1024	/* maximum word length as in tcsh */
+    char dabbrev_data[MAX_DABBREV];
+#endif
+    ScrnColors *oldColors;
 } Work;
 
 typedef struct {int foo;} XtermClassPart, TekClassPart;
@@ -2645,7 +2679,6 @@ extern WidgetClass tekWidgetClass;
 #define MODE_SRM	xBIT(3)	/* mode 12: send-receive mode */
 #define MODE_DECBKM	xBIT(4)	/* private mode 67: backarrow */
 #define MODE_DECSDM	xBIT(5)	/* private mode 80: sixel scrolling mode */
-
 
 #define N_MARGINBELL	10
 
