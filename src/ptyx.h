@@ -1,7 +1,7 @@
-/* $XTermId: ptyx.h,v 1.675 2010/10/11 08:25:53 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.682 2011/01/21 00:41:45 tom Exp $ */
 
 /*
- * Copyright 1999-2009,2010 by Thomas E. Dickey
+ * Copyright 1999-2010,2011 by Thomas E. Dickey
  *
  *                         All Rights Reserved
  *
@@ -60,6 +60,7 @@
 #endif
 
 /* ptyx.h */
+/* *INDENT-OFF* */
 /* @(#)ptyx.h	X10/6.6	11/10/86 */
 
 #include <X11/IntrinsicP.h>
@@ -90,6 +91,12 @@
 #define TypeMalloc(type)	TypeMallocN(type, 1)
 
 #define TypeRealloc(type,n,p)	(type *)realloc(p, (n) * sizeof(type))
+
+#define TypeXtReallocN(t,p,n)	(t *)(void *)XtRealloc((char *)(p), (Cardinal)(sizeof(t) * (size_t) (n)))
+
+#define TypeXtMallocX(type,n)	(type *)(void *)XtMalloc((Cardinal)(sizeof(type) + (size_t) (n)))
+#define TypeXtMallocN(type,n)	(type *)(void *)XtMalloc((Cardinal)(sizeof(type) * (size_t) (n)))
+#define TypeXtMalloc(type)	TypeXtMallocN(type, 1)
 
 /* use these to allocate partly-structured data */
 #define CastMallocN(type,n)	(type *)malloc(sizeof(type) + (size_t) (n))
@@ -1650,6 +1657,9 @@ typedef struct {
 
 	Boolean		awaitInput;	/* select-timeout mode		*/
 	Boolean		grabbedKbd;	/* keyboard is grabbed		*/
+#if OPT_MAXIMIZE
+	Boolean		fullscreen;	/* window is fullscreen		*/
+#endif
 #ifdef ALLOWLOGGING
 	int		logging;	/* logging mode			*/
 	int		logfd;		/* file descriptor of log	*/
@@ -2455,7 +2465,7 @@ typedef struct _TekWidgetRec {
  * These definitions do not depend on whether xterm supports active-icon.
  */
 #define VWindow(screen)		WhichVWin(screen)->window
-#define VShellWindow		XtWindow(SHELL_OF(term))
+#define VShellWindow(xw)	XtWindow(SHELL_OF(xw))
 #define TWindow(screen)		WhichTWin(screen)->window
 #define TShellWindow		XtWindow(SHELL_OF(tekWidget))
 
@@ -2508,8 +2518,8 @@ typedef struct _TekWidgetRec {
 
 #if OPT_TOOLBAR
 #define ToolbarHeight(w)	((resource.toolBar) \
-				 ? (term->VT100_TB_INFO(menu_height) \
-				  + term->VT100_TB_INFO(menu_border) * 2) \
+				 ? ((w)->VT100_TB_INFO(menu_height) \
+				  + (w)->VT100_TB_INFO(menu_border) * 2) \
 				 : 0)
 #else
 #define ToolbarHeight(w) 0
@@ -2602,5 +2612,7 @@ typedef struct Tek_Link
 #ifndef TRACE2
 #define TRACE2(p) /*nothing*/
 #endif
+
+/* *INDENT-ON* */
 
 #endif /* included_ptyx_h */

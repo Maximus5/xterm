@@ -1,58 +1,58 @@
-/* $XTermId: charproc.c,v 1.1091 2010/11/11 11:41:26 tom Exp $ */
+/* $XTermId: charproc.c,v 1.1100 2011/02/09 10:15:36 tom Exp $ */
 
 /*
-
-Copyright 1999-2009,2010 by Thomas E. Dickey
-
-                        All Rights Reserved
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE ABOVE LISTED COPYRIGHT HOLDER(S) BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-Except as contained in this notice, the name(s) of the above copyright
-holders shall not be used in advertising or otherwise to promote the
-sale, use or other dealings in this Software without prior written
-authorization.
-
-Copyright 1988  The Open Group
-
-Permission to use, copy, modify, distribute, and sell this software and its
-documentation for any purpose is hereby granted without fee, provided that
-the above copyright notice appear in all copies and that both that
-copyright notice and this permission notice appear in supporting
-documentation.
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
-OPEN GROUP BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN
-AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-Except as contained in this notice, the name of The Open Group shall not be
-used in advertising or otherwise to promote the sale, use or other dealings
-in this Software without prior written authorization from The Open Group.
-
-*/
+ * Copyright 1999-2010,2011 by Thomas E. Dickey
+ * 
+ *                         All Rights Reserved
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE ABOVE LISTED COPYRIGHT HOLDER(S) BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * 
+ * Except as contained in this notice, the name(s) of the above copyright
+ * holders shall not be used in advertising or otherwise to promote the
+ * sale, use or other dealings in this Software without prior written
+ * authorization.
+ * 
+ * 
+ * Copyright 1988  The Open Group
+ * 
+ * Permission to use, copy, modify, distribute, and sell this software and its
+ * documentation for any purpose is hereby granted without fee, provided that
+ * the above copyright notice appear in all copies and that both that
+ * copyright notice and this permission notice appear in supporting
+ * documentation.
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+ * OPEN GROUP BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN
+ * AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * 
+ * Except as contained in this notice, the name of The Open Group shall not be
+ * used in advertising or otherwise to promote the sale, use or other dealings
+ * in this Software without prior written authorization from The Open Group.
+ * 
+ */
 /*
  * Copyright 1987 by Digital Equipment Corporation, Maynard, Massachusetts.
  *
@@ -225,6 +225,11 @@ static char defaultTranslations[] =
          Shift <KeyPress> Select:select-cursor-start() select-cursor-end(SELECT, CUT_BUFFER0) \n\
          Shift <KeyPress> Insert:insert-selection(SELECT, CUT_BUFFER0) \n\
 "
+#if OPT_MAXIMIZE
+"\
+                 Alt <Key>Return:fullscreen() \n\
+"
+#endif
 #if OPT_SCROLL_LOCK
 "\
         <KeyRelease> Scroll_Lock:scroll-lock() \n\
@@ -374,6 +379,7 @@ static XtActionsRec actionsList[] = {
 #endif
 #if OPT_MAXIMIZE
     { "deiconify",		HandleDeIconify },
+    { "fullscreen",		HandleFullscreen },
     { "iconify",		HandleIconify },
     { "maximize",		HandleMaximize },
     { "restore",		HandleRestoreSize },
@@ -864,6 +870,9 @@ xtermAddInput(Widget w)
 	{ "ignore",		    HandleIgnore },
 #if OPT_DABBREV
 	{ "dabbrev-expand",	    HandleDabbrevExpand },
+#endif
+#if OPT_MAXIMIZE
+	{ "fullscreen",		    HandleFullscreen },
 #endif
 #if OPT_SCROLL_LOCK
 	{ "scroll-lock",	    HandleScrollLock },
@@ -4061,6 +4070,7 @@ SetCursorBlink(TScreen * screen, Bool enable)
     if (DoStartBlinking(screen)) {
 	StartBlinking(screen);
     } else {
+	/* EMPTY */
 #if !OPT_BLINK_TEXT
 	StopBlinking(screen);
 #endif
@@ -4152,7 +4162,7 @@ dpmodes(XtermWidget xw, BitFunc func)
 		 * Setting DECANM should have no effect, since this function
 		 * cannot be reached from vt52 mode.
 		 */
-		;
+		/* EMPTY */ ;
 	    }
 #if OPT_VT52_MODE
 	    else if (screen->terminal_id >= 100) {	/* VT52 */
@@ -4842,7 +4852,7 @@ get_icon_label(XtermWidget xw)
     XTextProperty text;
     char *result = 0;
 
-    if (XGetWMIconName(TScreenOf(xw)->display, VShellWindow, &text)) {
+    if (XGetWMIconName(TScreenOf(xw)->display, VShellWindow(xw), &text)) {
 	result = property_to_string(xw, &text);
     }
     return result;
@@ -4854,7 +4864,7 @@ get_window_label(XtermWidget xw)
     XTextProperty text;
     char *result = 0;
 
-    if (XGetWMName(TScreenOf(xw)->display, VShellWindow, &text)) {
+    if (XGetWMName(TScreenOf(xw)->display, VShellWindow(xw), &text)) {
 	result = property_to_string(xw, &text);
     }
     return result;
@@ -4912,7 +4922,7 @@ window_ops(XtermWidget xw)
 	if (AllowWindowOps(xw, ewRestoreWin)) {
 	    TRACE(("...de-iconify window\n"));
 	    XMapWindow(screen->display,
-		       VShellWindow);
+		       VShellWindow(xw));
 	}
 	break;
 
@@ -4920,7 +4930,7 @@ window_ops(XtermWidget xw)
 	if (AllowWindowOps(xw, ewMinimizeWin)) {
 	    TRACE(("...iconify window\n"));
 	    XIconifyWindow(screen->display,
-			   VShellWindow,
+			   VShellWindow(xw),
 			   DefaultScreen(screen->display));
 	}
 	break;
@@ -4932,7 +4942,7 @@ window_ops(XtermWidget xw)
 	    TRACE(("...move window to %d,%d\n", values.x, values.y));
 	    value_mask = (CWX | CWY);
 	    XReconfigureWMWindow(screen->display,
-				 VShellWindow,
+				 VShellWindow(xw),
 				 DefaultScreen(screen->display),
 				 value_mask,
 				 &values);
@@ -4948,14 +4958,14 @@ window_ops(XtermWidget xw)
     case ewRaiseWin:		/* Raise the window to the front of the stack */
 	if (AllowWindowOps(xw, ewRaiseWin)) {
 	    TRACE(("...raise window\n"));
-	    XRaiseWindow(screen->display, VShellWindow);
+	    XRaiseWindow(screen->display, VShellWindow(xw));
 	}
 	break;
 
     case ewLowerWin:		/* Lower the window to the bottom of the stack */
 	if (AllowWindowOps(xw, ewLowerWin)) {
 	    TRACE(("...lower window\n"));
-	    XLowerWindow(screen->display, VShellWindow);
+	    XLowerWindow(screen->display, VShellWindow(xw));
 	}
 	break;
 
@@ -5608,7 +5618,7 @@ RequestResize(XtermWidget xw, int rows, int cols, Bool text)
 
 	TRACE(("%s@%d -- ", __FILE__, __LINE__));
 	TRACE_HINTS(&xw->hints);
-	XSetWMNormalHints(screen->display, VShellWindow, &xw->hints);
+	XSetWMNormalHints(screen->display, VShellWindow(xw), &xw->hints);
 	TRACE(("%s@%d -- ", __FILE__, __LINE__));
 	TRACE_WM_HINTS(xw);
     }
@@ -7098,6 +7108,13 @@ VTRealize(Widget w,
 
     xw->hints.x = xpos;
     xw->hints.y = ypos;
+#if OPT_MAXIMIZE
+    /* assure single-increment resize for fullscreen */
+    if (term->screen.fullscreen) {
+	xw->hints.width_inc = 1;
+	xw->hints.height_inc = 1;
+    }
+#endif
     if ((XValue & pr) || (YValue & pr)) {
 	xw->hints.flags |= USSize | USPosition;
 	xw->hints.flags |= PWinGravity;
@@ -7142,12 +7159,12 @@ VTRealize(Widget w,
      * realized, so that it can do the right thing.
      */
     if (xw->hints.flags & USPosition)
-	XMoveWindow(XtDisplay(xw), XtWindow(SHELL_OF(xw)),
+	XMoveWindow(XtDisplay(xw), VShellWindow(xw),
 		    xw->hints.x, xw->hints.y);
 
     TRACE(("%s@%d -- ", __FILE__, __LINE__));
     TRACE_HINTS(&xw->hints);
-    XSetWMNormalHints(XtDisplay(xw), XtWindow(SHELL_OF(xw)), &xw->hints);
+    XSetWMNormalHints(XtDisplay(xw), VShellWindow(xw), &xw->hints);
     TRACE(("%s@%d -- ", __FILE__, __LINE__));
     TRACE_WM_HINTS(xw);
 
@@ -7155,7 +7172,7 @@ VTRealize(Widget w,
 	/* XChangeProperty format 32 really is "long" */
 	unsigned long pid_l = (unsigned long) getpid();
 	TRACE(("Setting _NET_WM_PID property to %lu\n", pid_l));
-	XChangeProperty(XtDisplay(xw), VShellWindow,
+	XChangeProperty(XtDisplay(xw), VShellWindow(xw),
 			pid_atom, XA_CARDINAL, 32, PropModeReplace,
 			(unsigned char *) &pid_l, 1);
     }
@@ -7290,7 +7307,7 @@ VTRealize(Widget w,
 
     resetCharsets(screen);
 
-    XDefineCursor(screen->display, VShellWindow, screen->pointer_cursor);
+    XDefineCursor(screen->display, VShellWindow(xw), screen->pointer_cursor);
 
     set_cur_col(screen, 0);
     set_cur_row(screen, 0);
@@ -7607,6 +7624,29 @@ VTInitI18N(XtermWidget xw)
 }
 #endif /* OPT_I18N_SUPPORT && OPT_INPUT_METHOD */
 
+static void
+set_cursor_outline_gc(XtermWidget xw,
+		      Boolean filled,
+		      Pixel fg,
+		      Pixel bg,
+		      Pixel cc)
+{
+    TScreen *screen = TScreenOf(xw);
+    VTwin *win = WhichVWin(screen);
+    CgsEnum cgsId = gcVTcursOutline;
+
+    if (cc == bg)
+	cc = fg;
+
+    if (filled) {
+	setCgsFore(xw, win, cgsId, bg);
+	setCgsBack(xw, win, cgsId, cc);
+    } else {
+	setCgsFore(xw, win, cgsId, cc);
+	setCgsBack(xw, win, cgsId, bg);
+    }
+}
+
 static Boolean
 VTSetValues(Widget cur,
 	    Widget request GCC_UNUSED,
@@ -7861,7 +7901,9 @@ ShowCursor(void)
 #if OPT_HIGHLIGHT_COLOR
 	if (screen->hilite_reverse) {
 	    if (in_selection && !reversed) {
-		;		/* really INVERSE ... */
+		/* EMPTY */
+		/* really INVERSE ... */
+		;
 	    } else if (in_selection || reversed) {
 		if (use_selbg) {
 		    if (use_selfg) {
@@ -7907,10 +7949,9 @@ ShowCursor(void)
 	y = CursorY(screen, screen->cur_row);
 
 	if (screen->cursor_underline) {
-
 	    /*
-	     * Overriding the combination of filled, reversed, in_selection
-	     * is too complicated since the underline and the text-cell use
+	     * Overriding the combination of filled, reversed, in_selection is
+	     * too complicated since the underline and the text-cell use
 	     * different rules.  Just redraw the text-cell, and draw the
 	     * underline on top of it.
 	     */
@@ -7918,7 +7959,7 @@ ShowCursor(void)
 
 	    /*
 	     * Our current-GC is likely to have been modified in HideCursor().
-	     * Setup a new request.
+	     * Set up a new request.
 	     */
 	    if (filled) {
 		if (T_COLOR(screen, TEXT_CURSOR) == xw->dft_foreground) {
@@ -7929,10 +7970,23 @@ ShowCursor(void)
 		setCgsFore(xw, currentWin, currentCgs, fg_pix);
 		setCgsBack(xw, currentWin, currentCgs, bg_pix);
 	    }
+	}
 
-	    outlineGC = getCgsGC(xw, currentWin, gcVTcursOutline);
-	    if (outlineGC == 0)
-		outlineGC = currentGC;
+	/*
+	 * Update the outline-gc, to keep the cursor color distinct from the
+	 * background color.
+	 */
+	set_cursor_outline_gc(xw,
+			      filled,
+			      fg_pix,
+			      bg_pix,
+			      T_COLOR(screen, TEXT_CURSOR));
+
+	outlineGC = getCgsGC(xw, currentWin, gcVTcursOutline);
+	if (outlineGC == 0)
+	    outlineGC = currentGC;
+
+	if (screen->cursor_underline) {
 
 	    /*
 	     * Finally, draw the underline.
@@ -7942,9 +7996,6 @@ ShowCursor(void)
 	    XDrawLines(screen->display, VWindow(screen), outlineGC,
 		       screen->box, NBOX, CoordModePrevious);
 	} else {
-	    outlineGC = getCgsGC(xw, currentWin, gcVTcursOutline);
-	    if (outlineGC == 0)
-		outlineGC = currentGC;
 
 	    drawXtermText(xw, flags & DRAWX_MASK,
 			  currentGC, x, y,
@@ -8694,9 +8745,7 @@ FindFontSelection(XtermWidget xw, const char *atom_name, Bool justprobe)
 	    break;
     }
     if (!a) {
-	atoms = (AtomPtr *) XtRealloc((char *) atoms,
-				      (Cardinal) sizeof(AtomPtr)
-				      * (atomCount + 1));
+	atoms = TypeXtReallocN(AtomPtr, atoms, atomCount + 1);
 	*(pAtom = &atoms[atomCount]) = XmuMakeAtom(atom_name);
     }
 
@@ -8766,16 +8815,11 @@ set_cursor_gcs(XtermWidget xw)
 	    /* both GC's use the same color */
 	    setCgsFore(xw, win, gcVTcursReverse, bg);
 	    setCgsBack(xw, win, gcVTcursReverse, cc);
-
-	    setCgsFore(xw, win, gcVTcursOutline, bg);
-	    setCgsBack(xw, win, gcVTcursOutline, cc);
 	} else {
 	    setCgsFore(xw, win, gcVTcursReverse, bg);
 	    setCgsBack(xw, win, gcVTcursReverse, cc);
-
-	    setCgsFore(xw, win, gcVTcursOutline, cc);
-	    setCgsBack(xw, win, gcVTcursOutline, bg);
 	}
+	set_cursor_outline_gc(xw, screen->always_highlight, fg, bg, cc);
 	changed = True;
     }
 

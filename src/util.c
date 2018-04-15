@@ -1,7 +1,7 @@
-/* $XTermId: util.c,v 1.541 2010/10/11 00:32:28 tom Exp $ */
+/* $XTermId: util.c,v 1.543 2011/02/09 10:11:44 tom Exp $ */
 
 /*
- * Copyright 1999-2009,2010 by Thomas E. Dickey
+ * Copyright 1999-2010,2011 by Thomas E. Dickey
  *
  *                         All Rights Reserved
  *
@@ -1250,7 +1250,7 @@ ClearInLine2(XtermWidget xw, int flags, int row, int col, unsigned len)
 	} while (!done);
 
 	screen->protected_mode = saved_mode;
-	if (len <= 0) {
+	if ((int) len <= 0) {
 	    return 0;
 	}
     }
@@ -1518,7 +1518,7 @@ CopyWait(XtermWidget xw)
     XEvent reply;
     XEvent *rep = &reply;
 
-    while (1) {
+    for (;;) {
 	XWindowEvent(screen->display, VWindow(screen),
 		     ExposureMask, &reply);
 	switch (reply.type) {
@@ -1722,7 +1722,7 @@ set_background(XtermWidget xw, int color GCC_UNUSED)
     Pixel c = getXtermBackground(xw, xw->flags, color);
 
     TRACE(("set_background(%d) %#lx\n", color, c));
-    XSetWindowBackground(screen->display, VShellWindow, c);
+    XSetWindowBackground(screen->display, VShellWindow(xw), c);
     XSetWindowBackground(screen->display, VWindow(screen), c);
 }
 
@@ -3403,7 +3403,7 @@ getXtermSizeHints(XtermWidget xw)
     TScreen *screen = TScreenOf(xw);
     long supp;
 
-    if (!XGetWMNormalHints(screen->display, XtWindow(SHELL_OF(xw)),
+    if (!XGetWMNormalHints(screen->display, VShellWindow(xw),
 			   &xw->hints, &supp))
 	memset(&xw->hints, 0, sizeof(xw->hints));
     TRACE_HINTS(&(xw->hints));
