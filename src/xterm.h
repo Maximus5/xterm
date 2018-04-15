@@ -1,7 +1,7 @@
-/* $XTermId: xterm.h,v 1.759 2015/12/30 02:00:38 tom Exp $ */
+/* $XTermId: xterm.h,v 1.764 2016/03/06 19:11:58 tom Exp $ */
 
 /*
- * Copyright 1999-2014,2015 by Thomas E. Dickey
+ * Copyright 1999-2015,2016 by Thomas E. Dickey
  *
  *                         All Rights Reserved
  *
@@ -372,6 +372,10 @@ extern char **environ;
 	    name = x_strdup(name)
 #define FREE_STRING(name) \
 	    free_string(name)
+
+/* strftime format and length of the result */
+#define FMT_TIMESTAMP ".%Y.%m.%d.%H.%M.%S"
+#define LEN_TIMESTAMP sizeof(".YYYY.MM.DD.hh.mm.ss")
 
 /***====================================================================***/
 
@@ -1109,6 +1113,12 @@ extern void xtermWarning (const char * /*fmt*/,...) GCC_PRINTFLIKE(1,2);
 extern void HandleDabbrevExpand        PROTO_XT_ACTIONS_ARGS;
 #endif
 
+#if OPT_EXEC_XTERM
+extern char *ProcGetCWD(pid_t /* pid */);
+#else
+#define ProcGetCWD(pid) NULL
+#endif
+
 #if OPT_MAXIMIZE
 extern int QueryMaximize (XtermWidget  /* termw */, unsigned * /* width */, unsigned * /* height */);
 extern void HandleDeIconify            PROTO_XT_ACTIONS_ARGS;
@@ -1171,6 +1181,13 @@ extern void xtermPrintScreen (XtermWidget /* xw */, Bool  /* use_DECPEX */, Prin
 extern void xtermPrintEverything (XtermWidget /* xw */, PrinterFlags * /* p */);
 extern void xtermPrintImmediately (XtermWidget /* xw */, String /* filename */, int /* opts */, int /* attributes */);
 extern void xtermPrintOnXError (XtermWidget /* xw */, int /* n */);
+
+#if OPT_SCREEN_DUMPS
+/* html.c */
+extern void xtermDumpHtml (XtermWidget /* xw */);
+/* svg.c */
+extern void xtermDumpSvg (XtermWidget /* xw */);
+#endif
 
 /* ptydata.c */
 #ifdef VMS

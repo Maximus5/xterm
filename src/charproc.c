@@ -1,7 +1,7 @@
-/* $XTermId: charproc.c,v 1.1414 2015/12/30 09:38:49 tom Exp $ */
+/* $XTermId: charproc.c,v 1.1417 2016/02/12 00:18:59 tom Exp $ */
 
 /*
- * Copyright 1999-2014,2015 by Thomas E. Dickey
+ * Copyright 1999-2015,2016 by Thomas E. Dickey
  *
  *                         All Rights Reserved
  *
@@ -325,6 +325,10 @@ static XtActionsRec actionsList[] = {
 #endif
 #if OPT_DEC_SOFTFONT
     { "set-font-loading",	HandleFontLoading },
+#endif
+#if OPT_SCREEN_DUMPS
+    { "dump-html",	        HandleDumpHtml },
+    { "dump-svg",	        HandleDumpSvg },
 #endif
 #if OPT_EXEC_XTERM
     { "spawn-new-terminal",	HandleSpawnTerminal },
@@ -7857,9 +7861,11 @@ VTInitialize(Widget wrequest,
     init_Bres(screen.cursor_underline);
     /* resources allow for underline or block, not (yet) bar */
     InitCursorShape(TScreenOf(wnew), TScreenOf(request));
+#if OPT_BLINK_CURS
     TRACE(("cursor_shape:%d blinks:%s\n",
 	   TScreenOf(wnew)->cursor_shape,
 	   BtoS(TScreenOf(wnew)->cursor_blink)));
+#endif
 #if OPT_BLINK_TEXT
     init_Ires(screen.blink_as_bold);
 #endif
@@ -10638,9 +10644,11 @@ ReallyReset(XtermWidget xw, Bool full, Bool saved)
     /* make cursor visible */
     screen->cursor_set = ON;
     InitCursorShape(screen, screen);
+#if OPT_BLINK_CURS
     TRACE(("cursor_shape:%d blinks:%s\n",
 	   screen->cursor_shape,
 	   BtoS(screen->cursor_blink)));
+#endif
 
     /* reset scrolling region */
     reset_margins(screen);
