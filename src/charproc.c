@@ -1,4 +1,4 @@
-/* $XTermId: charproc.c,v 1.797 2007/06/17 12:52:35 tom Exp $ */
+/* $XTermId: charproc.c,v 1.801 2007/06/27 00:29:49 tom Exp $ */
 
 /* $XFree86: xc/programs/xterm/charproc.c,v 3.185 2006/06/20 00:42:38 dickey Exp $ */
 
@@ -116,14 +116,6 @@ in this Software without prior written authorization from The Open Group.
 #include <X11/Xlocale.h>
 #endif
 
-#if HAVE_X11_SUNKEYSYM_H
-#include <X11/Sunkeysym.h>
-#endif
-
-#if HAVE_X11_XF86KEYSYM_H
-#include <X11/XF86keysym.h>
-#endif
-
 #include <stdio.h>
 #include <ctype.h>
 
@@ -228,18 +220,6 @@ static char defaultTranslations[] =
          Shift <KeyPress> Select:select-cursor-start() select-cursor-end(SELECT, CUT_BUFFER0) \n\
          Shift <KeyPress> Insert:insert-selection(SELECT, CUT_BUFFER0) \n\
 "
-#if OPT_EXTRA_PASTE
-#ifdef XF86XK_Paste
-"\
-            <KeyPress> XF86Paste:insert-selection(SELECT, CUT_BUFFER0) \n\
-"
-#endif
-#ifdef SunXK_Paste
-"\
-             <KeyPress> SunPaste:insert-selection(SELECT, CUT_BUFFER0) \n\
-"
-#endif
-#endif				/* OPT_EXTRA_PASTE */
 #if OPT_SHIFT_FONTS
 "\
     Shift~Ctrl <KeyPress> KP_Add:larger-vt-font() \n\
@@ -838,6 +818,11 @@ xtermAddInput(Widget w)
     XtAppAddActions(app_con, input_actions, XtNumber(input_actions));
 #endif
     XtAugmentTranslations(w, XtParseTranslationTable(defaultTranslations));
+
+#if OPT_EXTRA_PASTE
+    if (term && term->keyboard.extra_translations)
+	XtOverrideTranslations((Widget) term, XtParseTranslationTable(term->keyboard.extra_translations));
+#endif
 }
 
 #if OPT_ISO_COLORS
@@ -5116,6 +5101,8 @@ VTInit(void)
     TScreen *screen = TScreenOf(term);
     Widget vtparent = SHELL_OF(term);
 
+    TRACE(("VTInit {{\n"));
+
     XtRealizeWidget(vtparent);
     XtOverrideTranslations(vtparent, XtParseTranslationTable(xterm_trans));
     (void) XSetWMProtocols(XtDisplay(vtparent), XtWindow(vtparent),
@@ -5125,6 +5112,8 @@ VTInit(void)
 
     if (screen->allbuf == NULL)
 	VTallocbuf();
+
+    TRACE(("...}} VTInit\n"));
     return (1);
 }
 
@@ -6005,6 +5994,19 @@ releaseWindowGCs(XtermWidget xw, VTwin * win)
     }
 }
 
+#define TRACE_FREE_LEAK(name) \
+	if (name) { \
+	    free(name); \
+	    name = 0; \
+	    TRACE(("freed " #name "\n")); \
+	}
+
+#define FREE_LEAK(name) \
+	if (name) { \
+	    free(name); \
+	    name = 0; \
+	}
+
 static void
 VTDestroy(Widget w GCC_UNUSED)
 {
@@ -6018,33 +6020,13 @@ VTDestroy(Widget w GCC_UNUSED)
     if (screen->scrollWidget)
 	XtDestroyWidget(screen->scrollWidget);
 
-    if (screen->save_ptr) {
-	free(screen->save_ptr);
-	TRACE(("freed screen->save_ptr\n"));
-    }
-
-    if (screen->sbuf_address) {
-	free(screen->sbuf_address);
-	TRACE(("freed screen->sbuf_address\n"));
-    }
-    if (screen->allbuf) {
-	free(screen->allbuf);
-	TRACE(("freed screen->allbuf\n"));
-    }
-
-    if (screen->abuf_address) {
-	free(screen->abuf_address);
-	TRACE(("freed screen->abuf_address\n"));
-    }
-    if (screen->altbuf) {
-	free(screen->altbuf);
-	TRACE(("freed screen->altbuf\n"));
-    }
+    TRACE_FREE_LEAK(screen->save_ptr);
+    TRACE_FREE_LEAK(screen->sbuf_address);
+    TRACE_FREE_LEAK(screen->allbuf);
+    TRACE_FREE_LEAK(screen->abuf_address);
+    TRACE_FREE_LEAK(screen->altbuf);
 #if OPT_WIDE_CHARS
-    if (screen->draw_buf) {
-	free(screen->draw_buf);
-	TRACE(("freed screen->draw_buf\n"));
-    }
+    TRACE_FREE_LEAK(screen->draw_buf);
 #endif
 #if OPT_INPUT_METHOD
     if (screen->xim) {
@@ -6074,13 +6056,11 @@ VTDestroy(Widget w GCC_UNUSED)
 
     /* free local copies of resource strings */
     for (n = 0; n < NCOLORS; ++n) {
-	if (screen->Tcolors[n].resource)
-	    free(screen->Tcolors[n].resource);
+	FREE_LEAK(screen->Tcolors[n].resource);
     }
 #if OPT_SELECT_REGEX
     for (n = 0; n < NSELECTUNITS; ++n) {
-	if (screen->selectExpr[n])
-	    free(screen->selectExpr[n]);
+	FREE_LEAK(screen->selectExpr[n]);
     }
 #endif
 
@@ -6088,6 +6068,10 @@ VTDestroy(Widget w GCC_UNUSED)
 	XtFree((char *) (screen->selection_atoms));
 
     XtFree((char *) (screen->selection_data));
+
+    TRACE_FREE_LEAK(xw->keyboard.extra_translations);
+    TRACE_FREE_LEAK(xw->keyboard.shell_translations);
+    TRACE_FREE_LEAK(xw->keyboard.xterm_translations);
 #endif /* defined(NO_LEAKS) */
 }
 
@@ -6346,6 +6330,12 @@ VTRealize(Widget w,
 #endif
 #if OPT_NUM_LOCK
     VTInitModifiers(xw);
+#if OPT_EXTRA_PASTE
+    if (xw->keyboard.extra_translations) {
+	XtOverrideTranslations((Widget) xw,
+			       XtParseTranslationTable(xw->keyboard.extra_translations));
+    }
+#endif
 #endif
 
     set_cursor_gcs(xw);
@@ -7557,11 +7547,19 @@ DoSetSelectedFont(Widget w,
 	char *val;
 	char *test = 0;
 	char *used = 0;
-	unsigned len = strlen((char *) value);
+	unsigned len = *length;
+	unsigned tst;
 
-	if (len > (unsigned) *length) {
-	    len = (unsigned) *length;
+	/*
+	 * Some versions of X deliver null-terminated selections, some do not.
+	 */
+	for (tst = 0; tst < len; ++tst) {
+	    if (((char *) value)[tst] == '\0') {
+		len = tst;
+		break;
+	    }
 	}
+
 	if (len > 0 && (val = malloc(len + 1)) != 0) {
 	    memcpy(val, value, len);
 	    val[len] = '\0';
@@ -7582,8 +7580,6 @@ DoSetSelectedFont(Widget w,
 		    failed = True;
 		    free(test);
 		    xw->screen.MenuFontName(fontMenu_fontsel) = save;
-		} else {
-		    free(save);
 		}
 	    } else {
 		failed = True;
