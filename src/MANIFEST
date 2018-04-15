@@ -1,4 +1,4 @@
-MANIFEST for xterm-223, version xterm-223
+MANIFEST for xterm-224, version xterm-224
 --------------------------------------------------------------------------------
 MANIFEST                        this file
 256colres.h                     resource-definitions for 256-color mode
@@ -25,6 +25,7 @@ XTerm-col.ad                    color resource definitions for XTerm class
 XTerm.ad                        resource definitions for XTerm class
 aclocal.m4                      configure script: custom macros
 button.c                        mouse button and selection processing
+cachedGCs.c                     maintain cache of GC's
 charclass.c                     compact character-class module
 charclass.h                     interface of charclass.c
 charproc.c                      VT100 parser functions

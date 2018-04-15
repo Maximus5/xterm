@@ -1,7 +1,7 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <!--
  *****************************************************************************
- * Copyright 1996-2005,2006 by Thomas E. Dickey                              *
+ * Copyright 1996-2006,2007 by Thomas E. Dickey                              *
  * All Rights Reserved.                                                      *
  *                                                                           *
  * Permission to use, copy, modify, and distribute this software and its     *
@@ -20,7 +20,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF   *
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.            *
  *****************************************************************************
-  $XTermId: xterm.log.html,v 1.499 2006/12/01 01:10:03 tom Exp $
+  $XTermId: xterm.log.html,v 1.517 2007/02/11 15:24:42 tom Exp $
   $XFree86: xc/programs/xterm/xterm.log.html,v 1.151 2006/06/20 00:42:38 dickey Exp $
   -->
 <HTML>
@@ -31,7 +31,7 @@
 </HEAD>
 <BODY>
 <HR>
-Copyright 1997-2005,2006 by <A
+Copyright &copy; 1997-2006,2007 by <A
 HREF="mailto:dickey@invisible-island.net">Thomas E. Dickey</A>
 <HR>
 <H1>Contents</H1>
@@ -46,6 +46,7 @@ Most of these are summarized in the XFree86 CHANGELOG
 is the latest version of this file.
 
 <UL>
+<LI><A HREF="#xterm_224">Patch #224 - 2007/2/11</A>
 <LI><A HREF="#xterm_223">Patch #223 - 2006/11/30</A>
 <LI><A HREF="#xterm_222">Patch #222 - 2006/10/17</A>
 <LI><A HREF="#xterm_221">Patch #221 - 2006/10/1</A>
@@ -271,6 +272,67 @@ is the latest version of this file.
 <LI><A HREF="#xterm_02">Patch #2 - 1996/1/7</A>
 <LI><A HREF="#xterm_01">Patch #1 - 1996/1/6</A>
 </UL>
+
+<H1><A NAME="xterm_224">Patch #224 - 2007/2/11</A></H1>
+<ul>
+	<li>simplify code for set/reset mode for blinking cursor 
+	    (patch by Emanuele Giaquinta).
+
+	<li>modify <code>dabbrev-expand()</code> to restart after the last
+	    match (patch by Emanuele Giaquinta).
+
+	<li>add control sequences for enabling/disabling focus in/out event
+	    reporting (request by Bram Moolenaar).
+
+	<li>improve startup performance of menus by adding resource setting
+	    <code>menuLocale</code> which can be set to override X's
+	    lengthy initialization of fontsets - which are seldom used
+	    for the <code>Xaw</code> popup menus (adapted by patch by
+	    Dave Coffin).
+
+	<li>modify do_precomposition() function and make-compose.sh to handle
+	    21-bit codes vs the 16-bit codes those were written for, and
+	    fix a few mis-sorted codes
+	    (patch by Thomas Wolff).
+
+	<li>handle special case in <code>-cjk_width</code>
+	    which unexpectedly caused a character's width to change when
+	    a combining character
+	    (patch by Thomas Wolff)
+
+	<li>fix build for GNU/KFreeBSD (Debian #40111).
+
+	<li>consolidate GC creation/updating into a single module to reduce GC
+	    manipulation (prompted by Debian #389476, though a complete fix
+	    would involve optimizing the scrolling behavior).
+
+	<li>fix ifdef of xtermCellWidth(), which broke for a case without
+	    TrueType and without wide-character support (report by Martin
+	    Pirker).
+
+	<li>undo a comparison in <code>handle_translated_exposure</code> which
+	    did not work due to X server optimization.  That caused the
+	    inner border to be repainted with unexpected colors when handling
+	    a repaint, e.g., after switching to/from another workspace
+	    (Debian #401726, Redhat Bugzilla #223027).
+
+	<li>allow <code>-cr</code> option to override cursor color when
+	    <code>-ah</code> option is used (Debian #406502).
+
+	<li>add a note in xterm's manpage explaining that the <code>-bw</code>
+	    (or <code>-w</code>) option is only used by the window manager,
+	    if at all (Debian #405043).
+
+	<li>make <code>Selection</code> of <code>VT&nbsp;Fonts</code> work with
+	    <code>selectToClipboard</code> resource.
+
+	<li>correct length calculation for <code>Selection</code> entry of
+	    <code>VT&nbsp;Fonts</code> menu, broken since it ignored the
+	    actual selection length since X11R4.
+
+	<li>fixes for fontsize changes with <code>-fa</code> option (Redhat
+	    Bugzilla #222340).
+</ul>
 
 <H1><A NAME="xterm_223">Patch #223 - 2006/11/30</A></H1>
 <ul>
@@ -3787,7 +3849,7 @@ is the latest version of this file.
 	  Jim Knoble &lt;jmknoble@pobox.com&gt;).
 
 	<li>correct ifdef'ing for conflict between definitions in AIX's
-	  &lt;sys/select.h&gt; and &lt;X11/XPoll.h&gt; (reported by Clint
+	  &lt;sys/select.h&gt; and &lt;X11/Xpoll.h&gt; (reported by Clint
 	  Olsen).
 
 	<li>add checks for return-values of getutid(), initgroups() and
@@ -4174,12 +4236,12 @@ is the latest version of this file.
 	  (prompted by a problem report for <code>-C</code> by Jeremie Petit
 	  &lt;Jeremie.Petit@digital.com&gt;).
 
-	<li>add workaround for conflict between &lt;X11/XPoll.h&gt; and
+	<li>add workaround for conflict between &lt;X11/Xpoll.h&gt; and
 	  &lt;sys/select.h&gt; on AIX 4.3 (Richard Griswold
 	  &lt;griswold@acm.org&gt;).
 
 	<li>add configure script test to resolve conflict between between
-	  &lt;X11/XPoll.h&gt; and &lt;sys/select.h&gt;
+	  &lt;X11/Xpoll.h&gt; and &lt;sys/select.h&gt;
 
 	<li>modify translation of UTF-8 sequences to reject "overly long"
 	  variations (patch by Markus Kuhn).

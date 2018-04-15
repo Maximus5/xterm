@@ -1,9 +1,9 @@
-/* $XTermId: ptyx.h,v 1.446 2006/11/23 01:18:29 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.467 2007/02/11 14:54:34 tom Exp $ */
 
 /* $XFree86: xc/programs/xterm/ptyx.h,v 3.134 2006/06/19 00:36:51 dickey Exp $ */
 
 /*
- * Copyright 1999-2005,2006 by Thomas E. Dickey
+ * Copyright 1999-2006,2007 by Thomas E. Dickey
  *
  *                         All Rights Reserved
  *
@@ -261,7 +261,7 @@
  * mouse events into the proper routines. */
 
 typedef enum {
-    NORMAL
+    NORMAL = 0
     , LEFTEXTENSION
     , RIGHTEXTENSION
 } EventMode;
@@ -471,6 +471,10 @@ typedef struct {
 #else
 #define OPT_EBCDIC 0
 #endif
+#endif
+
+#ifndef OPT_FOCUS_EVENT
+#define OPT_FOCUS_EVENT	1 /* focus in/out events */
 #endif
 
 #ifndef OPT_HP_FUNC_KEYS
@@ -708,22 +712,58 @@ typedef enum {
     , fMAX
 } VTFontEnum;
 
+/*
+ * Indices for cachedGCs.c (unrelated to VTFontEnum).
+ */
+typedef enum {
+    gcNorm = 0
+    , gcBold
+    , gcNormReverse
+    , gcBoldReverse
+#if OPT_BOX_CHARS
+    , gcLine
+    , gcDots
+#endif
+#if OPT_DEC_CHRSET
+    , gcCNorm
+    , gcCBold
+#endif
+#if OPT_WIDE_CHARS
+    , gcWide
+    , gcWBold
+    , gcWideReverse
+    , gcWBoldReverse
+#endif
+    , gcVTcursNormal
+    , gcVTcursFilled
+    , gcVTcursReverse
+    , gcVTcursOutline
+#if OPT_TEK4014
+    , gcTKcurs
+#endif
+    , gcMAX
+} CgsEnum;
+
+#define for_each_text_gc(n) for (n = gcNorm; n < gcVTcursNormal; ++n)
+#define for_each_curs_gc(n) for (n = gcVTcursNormal; n <= gcVTcursOutline; ++n)
+#define for_each_gc(n)      for (n = gcNorm; n < gcMAX; ++n)
+
 /* indices for the normal terminal colors in screen.Tcolors[] */
 typedef enum {
     TEXT_FG = 0			/* text foreground */
-    , TEXT_BG = 1		/* text background */
-    , TEXT_CURSOR = 2		/* text cursor */
-    , MOUSE_FG = 3		/* mouse foreground */
-    , MOUSE_BG = 4		/* mouse background */
+    , TEXT_BG			/* text background */
+    , TEXT_CURSOR		/* text cursor */
+    , MOUSE_FG			/* mouse foreground */
+    , MOUSE_BG			/* mouse background */
 #if OPT_TEK4014
-    , TEK_FG = 5		/* tektronix foreground */
-    , TEK_BG = 6		/* tektronix background */
+    , TEK_FG			/* tektronix foreground */
+    , TEK_BG			/* tektronix background */
 #endif
 #if OPT_HIGHLIGHT_COLOR
-    , HIGHLIGHT_BG = 7		/* highlight background */
+    , HIGHLIGHT_BG		/* highlight background */
 #endif
 #if OPT_TEK4014
-    , TEK_CURSOR = 8		/* tektronix cursor */
+    , TEK_CURSOR		/* tektronix cursor */
 #endif
     , NCOLORS			/* total number of colors */
 } TermColors;
@@ -1089,7 +1129,6 @@ typedef struct {
 	unsigned	chrset;
 	unsigned	flags;
 	XFontStruct *	fs;
-	GC		gc;
 	char *		fn;
 } XTermFonts;
 
@@ -1128,6 +1167,9 @@ typedef enum {
 	DP_X_X10MSE,
 #if OPT_BLINK_CURS
 	DP_CRS_BLINK,
+#endif
+#if OPT_FOCUS_EVENT
+	DP_X_FOCUS,
 #endif
 #if OPT_TOOLBAR
 	DP_TOOLBAR,
@@ -1204,7 +1246,7 @@ typedef struct {
 #define VT100_TB_INFO(name) screen.fullVwin.tb_info.name
 #endif
 
-struct _vtwin {
+typedef struct {
 	Window		window;		/* X window id			*/
 	int		width;		/* width of columns		*/
 	int		height;		/* height of rows		*/
@@ -1215,24 +1257,20 @@ struct _vtwin {
 	int		f_ascent;	/* ascent of font in pixels	*/
 	int		f_descent;	/* descent of font in pixels	*/
 	SbInfo		sb_info;
-	GC		normalGC;	/* normal painting		*/
-	GC		reverseGC;	/* reverse painting		*/
-	GC		normalboldGC;	/* normal painting, bold font	*/
-	GC		reverseboldGC;	/* reverse painting, bold font	*/
 #if OPT_TOOLBAR
 	Boolean		active;		/* true if toolbars are used	*/
 	TbInfo		tb_info;	/* toolbar information		*/
 #endif
-};
+} VTwin;
 
-struct _tekwin {
+typedef struct {
 	Window		window;		/* X window id			*/
 	int		width;		/* width of columns		*/
 	int		height;		/* height of rows		*/
 	Dimension	fullwidth;	/* full width of window		*/
 	Dimension	fullheight;	/* full height of window	*/
 	double		tekscale;	/* scale factor Tek -> vs100	*/
-};
+} TKwin;
 
 typedef struct {
 /* These parameters apply to both windows */
@@ -1250,10 +1288,6 @@ typedef struct {
 	pid_t		pid;		/* pid of process on far side   */
 	uid_t		uid;		/* user id of actual person	*/
 	gid_t		gid;		/* group id of actual person	*/
-	GC		cursorGC;	/* normal cursor painting	*/
-	GC		fillCursorGC;	/* special cursor painting	*/
-	GC		reversecursorGC;/* reverse cursor painting	*/
-	GC		cursoroutlineGC;/* for painting lines around    */
 	ColorRes	Tcolors[NCOLORS]; /* terminal colors		*/
 #if OPT_ISO_COLORS
 	ColorRes	Acolors[MAXCOLORS]; /* ANSI color emulation	*/
@@ -1308,10 +1342,11 @@ typedef struct {
 	unsigned long	event_mask;
 	unsigned short	send_mouse_pos;	/* user wants mouse transition  */
 					/* and position information	*/
+	Boolean		send_focus_pos; /* user wants focus in/out info */
 #if OPT_PASTE64
 	int		base64_paste;	/* set to send paste in base64	*/
 	int		base64_final;	/* string-terminator for paste	*/
-	/* _qWriteSelectionData expects these to be initialized to zero. 
+	/* _qWriteSelectionData expects these to be initialized to zero.
 	 * base64_flush() is the last step of the conversion, it clears these
 	 * variables.
 	 */
@@ -1361,10 +1396,10 @@ typedef struct {
 
 /* VT window parameters */
 	Boolean		Vshow;		/* VT window showing		*/
-	struct _vtwin	fullVwin;
+	VTwin		fullVwin;
 #ifndef NO_ACTIVE_ICON
-	struct _vtwin	iconVwin;
-	struct _vtwin *	whichVwin;
+	VTwin		iconVwin;
+	VTwin		*whichVwin;
 #endif /* NO_ACTIVE_ICON */
 
 	Cursor	pointer_cursor;		/* pointer cursor in window	*/
@@ -1409,6 +1444,9 @@ typedef struct {
 	int		blink_off;	/* cursor off time (msecs)	*/
 	XtIntervalId	blink_timer;	/* timer-id for cursor-proc	*/
 #endif
+#if OPT_ZICONBEEP
+	Boolean		zIconBeep_flagged; /* True if icon name was changed */
+#endif /* OPT_ZICONBEEP */
 	int		cursor_GC;	/* see ShowCursor()		*/
 	int		cursor_set;	/* requested state		*/
 	CELL		cursorp;	/* previous cursor row/column	*/
@@ -1534,6 +1572,7 @@ typedef struct {
 	Boolean		selectToClipboard; /* primary vs clipboard */
 	String		*mappedSelect;	/* mapping for "SELECT" to "PRIMARY" */
 
+	Boolean		waitingForTrackInfo;
 	int		numberOfClicks;
 	int		maxClicks;
 	int		multiClickTime;	/* time between multiclick selects */
@@ -1552,6 +1591,7 @@ typedef struct {
 	Char		*selection_data; /* the current selection */
 	int		selection_size; /* size of allocated buffer */
 	int		selection_length; /* number of significant bytes */
+	EventMode	eventMode;
 	Time		selection_time;	/* latest event timestamp */
 	Time		lastButtonUpTime;
 
@@ -1630,10 +1670,10 @@ typedef struct _TekScreen {
 	GC		TcursorGC;	/* normal cursor painting	*/
 
 	Boolean		waitrefresh;	/* postpone refresh		*/
-	struct _tekwin	fullTwin;
+	TKwin		fullTwin;
 #ifndef NO_ACTIVE_ICON
-	struct _tekwin	iconTwin;
-	struct _tekwin *whichTwin;
+	TKwin		iconTwin;
+	TKwin		*whichTwin;
 #endif /* NO_ACTIVE_ICON */
 
 	Cursor		arrow;		/* arrow cursor			*/
@@ -1979,6 +2019,8 @@ typedef struct _TekWidgetRec {
 #define DEC_PROTECT 1
 #define ISO_PROTECT 2
 
+#define TScreenOf(xw)	(&(xw)->screen)
+
 #ifdef SCROLLBAR_RIGHT
 #define OriginX(screen) (((term->misc.useRight)?0:ScrollbarWidth(screen)) + screen->border)
 #else
@@ -2024,6 +2066,8 @@ typedef struct _TekWidgetRec {
 
 #endif /* NO_ACTIVE_ICON */
 
+#define okFont(font) ((font) != 0 && (font)->fid != 0)
+
 /*
  * Macro to check if we are iconified; do not use render for that case.
  */
@@ -2047,11 +2091,17 @@ typedef struct _TekWidgetRec {
 #define NormalFont(screen)	WhichVFont(screen, fnts[fNorm])
 #define BoldFont(screen)	WhichVFont(screen, fnts[fBold])
 
+#if OPT_WIDE_CHARS
+#define NormalWFont(screen)	WhichVFont(screen, fnts[fWide])
+#define BoldWFont(screen)	WhichVFont(screen, fnts[fWBold])
+#endif
+
 #define ScrollbarWidth(screen)	WhichVWin(screen)->sb_info.width
-#define NormalGC(screen)	WhichVWin(screen)->normalGC
-#define ReverseGC(screen)	WhichVWin(screen)->reverseGC
-#define NormalBoldGC(screen)	WhichVWin(screen)->normalboldGC
-#define ReverseBoldGC(screen)	WhichVWin(screen)->reverseboldGC
+
+#define NormalGC(w,sp)		getCgsGC(w, WhichVWin(sp), gcNorm)
+#define ReverseGC(w,sp)		getCgsGC(w, WhichVWin(sp), gcNormReverse)
+#define NormalBoldGC(w,sp)	getCgsGC(w, WhichVWin(sp), gcBold)
+#define ReverseBoldGC(w,sp)	getCgsGC(w, WhichVWin(sp), gcBoldReverse)
 
 #define TWidth(screen)		WhichTWin(screen)->width
 #define THeight(screen)		WhichTWin(screen)->height

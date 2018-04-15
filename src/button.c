@@ -1,7 +1,7 @@
-/* $XTermId: button.c,v 1.257 2006/11/18 22:07:42 tom Exp $ */
+/* $XTermId: button.c,v 1.263 2007/02/09 01:27:49 tom Exp $ */
 
 /*
- * Copyright 1999-2005,2006 by Thomas E. Dickey
+ * Copyright 1999-2006,2007 by Thomas E. Dickey
  *
  *                         All Rights Reserved
  *
@@ -939,7 +939,7 @@ HandleSelectExtend(Widget w,
 	CELL cell;
 
 	screen->selection_time = event->xmotion.time;
-	switch (eventMode) {
+	switch (screen->eventMode) {
 	    /* If not in one of the DEC mouse-reporting modes */
 	case LEFTEXTENSION:
 	case RIGHTEXTENSION:
@@ -982,11 +982,11 @@ do_select_end(XtermWidget xw,
 {
 #if OPT_READLINE
     int ldelta1, ldelta2;
-    TScreen *screen = &xw->screen;
 #endif
+    TScreen *screen = &xw->screen;
 
-    xw->screen.selection_time = event->xbutton.time;
-    switch (eventMode) {
+    screen->selection_time = event->xbutton.time;
+    switch (screen->eventMode) {
     case NORMAL:
 	(void) SendMousePosition(xw, event);
 	break;
@@ -1093,7 +1093,7 @@ _SelectionTargets(Widget w)
     if (!IsXtermWidget(w))
 	return NULL;
 
-    screen = &((XtermWidget) w)->screen;
+    screen = TScreenOf((XtermWidget) w);
 
 #if OPT_WIDE_CHARS
     if (screen->wide_chars) {
@@ -1554,7 +1554,7 @@ SelectionReceived(Widget w,
 
     if (!IsXtermWidget(w))
 	return;
-    screen = &((XtermWidget) w)->screen;
+    screen = TScreenOf((XtermWidget) w);
     dpy = XtDisplay(w);
 
     if (*type == 0		/*XT_CONVERT_FAIL */
@@ -1784,7 +1784,7 @@ TrackDown(XtermWidget xw, XButtonEvent * event)
 	screen->replyToEmacs = True;
 	StartSelect(xw, &cell);
     } else {
-	waitingForTrackInfo = True;
+	screen->waitingForTrackInfo = True;
 	EditorButton(xw, (XButtonEvent *) event);
     }
 }
@@ -1801,11 +1801,12 @@ TrackMouse(XtermWidget xw,
 	   int firstrow,
 	   int lastrow)
 {
-    if (waitingForTrackInfo) {	/* if Timed, ignore */
-	waitingForTrackInfo = False;
-	if (func != 0) {
-	    TScreen *screen = &(xw->screen);
+    if (func != 0) {
+	TScreen *screen = &(xw->screen);
+
+	if (screen->waitingForTrackInfo) {	/* if Timed, ignore */
 	    CELL first = *start;
+	    screen->waitingForTrackInfo = False;
 
 	    boundsCheck(first.row);
 	    boundsCheck(firstrow);
@@ -1834,10 +1835,10 @@ StartSelect(XtermWidget xw, const CELL * cell)
     screen->saveStartR = screen->startExt = screen->rawPos;
     screen->saveEndR = screen->endExt = screen->rawPos;
     if (Coordinate(screen, cell) < Coordinate(screen, &(screen->rawPos))) {
-	eventMode = LEFTEXTENSION;
+	screen->eventMode = LEFTEXTENSION;
 	screen->startExt = *cell;
     } else {
-	eventMode = RIGHTEXTENSION;
+	screen->eventMode = RIGHTEXTENSION;
 	screen->endExt = *cell;
     }
     ComputeSelect(xw, &(screen->startExt), &(screen->endExt), False);
@@ -1892,7 +1893,7 @@ EndExtend(XtermWidget xw,
 	}
     }
     SelectSet(xw, event, params, num_params);
-    eventMode = NORMAL;
+    screen->eventMode = NORMAL;
 }
 
 void
@@ -1981,11 +1982,11 @@ do_start_extend(XtermWidget xw,
 	< Abs(coord - Coordinate(screen, &(screen->endSel)))
 	|| coord < Coordinate(screen, &(screen->startSel))) {
 	/* point is close to left side of selection */
-	eventMode = LEFTEXTENSION;
+	screen->eventMode = LEFTEXTENSION;
 	screen->startExt = cell;
     } else {
 	/* point is close to left side of selection */
-	eventMode = RIGHTEXTENSION;
+	screen->eventMode = RIGHTEXTENSION;
 	screen->endExt = cell;
     }
     ComputeSelect(xw, &(screen->startExt), &(screen->endExt), True);
@@ -2003,19 +2004,19 @@ ExtendExtend(XtermWidget xw, const CELL * cell)
     int coord = Coordinate(screen, cell);
 
     TRACE(("ExtendExtend row=%d, col=%d\n", cell->row, cell->col));
-    if (eventMode == LEFTEXTENSION
+    if (screen->eventMode == LEFTEXTENSION
 	&& ((coord + (screen->selectUnit != Select_CHAR))
 	    > Coordinate(screen, &(screen->endSel)))) {
 	/* Whoops, he's changed his mind.  Do RIGHTEXTENSION */
-	eventMode = RIGHTEXTENSION;
+	screen->eventMode = RIGHTEXTENSION;
 	screen->startExt = screen->saveStartR;
-    } else if (eventMode == RIGHTEXTENSION
+    } else if (screen->eventMode == RIGHTEXTENSION
 	       && coord < Coordinate(screen, &(screen->startSel))) {
 	/* Whoops, he's changed his mind.  Do LEFTEXTENSION */
-	eventMode = LEFTEXTENSION;
+	screen->eventMode = LEFTEXTENSION;
 	screen->endExt = screen->saveEndR;
     }
-    if (eventMode == LEFTEXTENSION) {
+    if (screen->eventMode == LEFTEXTENSION) {
 	screen->startExt = *cell;
     } else {
 	screen->endExt = *cell;
@@ -3069,7 +3070,7 @@ _ConvertSelectionHelper(Widget w,
 {
     if (IsXtermWidget(w)) {
 	Display *d = XtDisplay(w);
-	TScreen *screen = &((XtermWidget) w)->screen;
+	TScreen *screen = TScreenOf((XtermWidget) w);
 	XTextProperty textprop;
 	char *the_data = (char *) screen->selection_data;
 
@@ -3102,7 +3103,7 @@ ConvertSelection(Widget w,
     if (!IsXtermWidget(w))
 	return False;
 
-    screen = &((XtermWidget) w)->screen;
+    screen = TScreenOf((XtermWidget) w);
 
     if (screen->selection_data == NULL)
 	return False;		/* can this happen? */
@@ -3261,7 +3262,7 @@ LoseSelection(Widget w, Atom * selection)
     if (!IsXtermWidget(w))
 	return;
 
-    screen = &((XtermWidget) w)->screen;
+    screen = TScreenOf((XtermWidget) w);
     for (i = 0, atomP = screen->selection_atoms;
 	 i < screen->selection_count; i++, atomP++) {
 	if (*selection == *atomP)
@@ -3548,6 +3549,7 @@ EditorButton(XtermWidget xw, XButtonEvent * event)
     int row, col;
     int button;
     unsigned count = 0;
+    Boolean changed = True;
 
     /* If button event, get button # adjusted for DEC compatibility */
     button = event->button - 1;
@@ -3615,25 +3617,55 @@ EditorButton(XtermWidget xw, XButtonEvent * event)
 	     * events only if character cell has changed.
 	     */
 	    if ((row == screen->mouse_row)
-		&& (col == screen->mouse_col))
-		return;
-	    line[count++] = BtnCode(event, screen->mouse_button);
+		&& (col == screen->mouse_col)) {
+		changed = False;
+	    } else {
+		line[count++] = BtnCode(event, screen->mouse_button);
+	    }
 	    break;
 	default:
-	    return;
+	    changed = False;
+	    break;
 	}
     }
 
-    screen->mouse_row = row;
-    screen->mouse_col = col;
+    if (changed) {
+	screen->mouse_row = row;
+	screen->mouse_col = col;
 
-    /* Add pointer position to key sequence */
-    line[count++] = ' ' + col + 1;
-    line[count++] = ' ' + row + 1;
+	/* Add pointer position to key sequence */
+	line[count++] = ' ' + col + 1;
+	line[count++] = ' ' + row + 1;
 
-    TRACE(("mouse at %d,%d button+mask = %#x\n", row, col,
-	   (screen->control_eight_bits) ? line[2] : line[3]));
+	TRACE(("mouse at %d,%d button+mask = %#x\n", row, col,
+	       (screen->control_eight_bits) ? line[2] : line[3]));
 
-    /* Transmit key sequence to process running under xterm */
-    v_write(pty, line, count);
+	/* Transmit key sequence to process running under xterm */
+	v_write(pty, line, count);
+    }
+    return;
 }
+
+#if OPT_FOCUS_EVENT
+void
+SendFocusButton(XtermWidget xw, XFocusChangeEvent * event)
+{
+    TScreen *screen = &(xw->screen);
+
+    if (screen->send_focus_pos) {
+	ANSI reply;
+
+	memset(&reply, 0, sizeof(reply));
+	reply.a_type = CSI;
+
+#if OPT_SCO_FUNC_KEYS
+	if (xw->keyboard.type == keyboardIsSCO) {
+	    reply.a_pintro = '>';
+	}
+#endif
+	reply.a_final = (event->type == FocusIn) ? 'I' : 'O';
+	unparseseq(xw, &reply);
+    }
+    return;
+}
+#endif /* OPT_FOCUS_EVENT */
