@@ -1,4 +1,4 @@
-/* $XTermId: xterm.h,v 1.694 2012/05/09 10:47:22 tom Exp $ */
+/* $XTermId: xterm.h,v 1.697 2012/06/24 18:33:27 tom Exp $ */
 
 /*
  * Copyright 1999-2011,2012 by Thomas E. Dickey
@@ -63,6 +63,7 @@
 #define IGNORE_RC(func) (void) func
 #endif /* gcc workarounds */
 
+#undef bcopy
 #include <X11/Xos.h>
 
 #ifndef HAVE_CONFIG_H
@@ -448,6 +449,7 @@ extern char **environ;
 #define XtNmkWidth		"mkWidth"
 #define XtNmodifyCursorKeys	"modifyCursorKeys"
 #define XtNmodifyFunctionKeys	"modifyFunctionKeys"
+#define XtNmodifyKeyboard	"modifyKeyboard"
 #define XtNmodifyKeypadKeys	"modifyKeypadKeys"
 #define XtNmodifyOtherKeys	"modifyOtherKeys"
 #define XtNmodifyStringKeys	"modifyStringKeys"
@@ -620,6 +622,7 @@ extern char **environ;
 #define XtCMkWidth		"MkWidth"
 #define XtCModifyCursorKeys	"ModifyCursorKeys"
 #define XtCModifyFunctionKeys	"ModifyFunctionKeys"
+#define XtCModifyKeyboard	"ModifyKeyboard"
 #define XtCModifyKeypadKeys	"ModifyKeypadKeys"
 #define XtCModifyOtherKeys	"ModifyOtherKeys"
 #define XtCModifyStringKeys	"ModifyStringKeys"
@@ -1093,7 +1096,6 @@ extern void FlushLog (XtermWidget /* xw */);
 extern Bool xtermHasPrinter (XtermWidget /* xw */);
 extern PrinterFlags *getPrinterFlags (XtermWidget /* xw */, String * /* params */, Cardinal * /* param_count */);
 extern int xtermPrinterControl (XtermWidget /* xw */, int /* chr */);
-extern void closePrinter (XtermWidget /* xw */);
 extern void setPrinterControlMode (XtermWidget /* xw */, int /* mode */);
 extern void xtermAutoPrint (XtermWidget /* xw */, unsigned /* chr */);
 extern void xtermMediaControl (XtermWidget /* xw */, int  /* param */, int  /* private_seq */);

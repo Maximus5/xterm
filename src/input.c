@@ -1,4 +1,4 @@
-/* $XTermId: input.c,v 1.334 2012/03/15 00:01:30 tom Exp $ */
+/* $XTermId: input.c,v 1.338 2012/06/11 00:08:38 tom Exp $ */
 
 /*
  * Copyright 1999-2011,2012 by Thomas E. Dickey
@@ -72,6 +72,10 @@
 
 #if HAVE_X11_XF86KEYSYM_H
 #include <X11/XF86keysym.h>
+#endif
+
+#ifdef HAVE_XKBKEYCODETOKEYSYM
+#include <X11/XKBlib.h>
 #endif
 
 #include <X11/Xutil.h>
@@ -203,19 +207,58 @@ AdjustAfterInput(XtermWidget xw)
  * Return true if the key is on the editing keypad.  This overlaps with
  * IsCursorKey() and IsKeypadKey() and must be tested before those macro to
  * distinguish it from them.
+ *
+ * VT220  emulation  uses  the  VT100  numeric  keypad as well as a 6-key
+ * editing keypad. Here's a picture of the VT220 editing keypad:
+ *      +--------+--------+--------+
+ *      | Find   | Insert | Remove |
+ *      +--------+--------+--------+
+ *      | Select | Prev   | Next   |
+ *      +--------+--------+--------+
+ *
+ * and the similar Sun and PC keypads:
+ *      +--------+--------+--------+
+ *      | Insert | Home   | PageUp |
+ *      +--------+--------+--------+
+ *      | Delete | End    | PageDn |
+ *      +--------+--------+--------+
+ */
+static Bool
+IsEditKeypad(KeySym keysym)
+{
+    Bool result;
+
+    switch (keysym) {
+    case XK_Home:
+    case XK_End:
+    case XK_Prior:
+    case XK_Next:
+    case XK_Insert:
+    case XK_Delete:
+    case XK_Find:
+    case XK_Select:
+#ifdef DXK_Remove
+    case DXK_Remove:
+#endif
+	result = True;
+	break;
+    default:
+	result = False;
+	break;
+    }
+    return result;
+}
+
+/*
+ * Editing-keypad, plus other editing keys which are not included in the
+ * other macros.
  */
 static Bool
 IsEditFunctionKey(KeySym keysym)
 {
+    Bool result;
+
     switch (keysym) {
-    case XK_Prior:		/* editing keypad */
-    case XK_Next:		/* editing keypad */
-    case XK_Insert:		/* editing keypad */
-    case XK_Find:		/* editing keypad */
-    case XK_Select:		/* editing keypad */
-#ifdef DXK_Remove
-    case DXK_Remove:		/* editing keypad */
-#endif
 #ifdef XK_KP_Delete
     case XK_KP_Delete:		/* editing key on numeric keypad */
     case XK_KP_Insert:		/* editing key on numeric keypad */
@@ -223,10 +266,13 @@ IsEditFunctionKey(KeySym keysym)
 #ifdef XK_ISO_Left_Tab
     case XK_ISO_Left_Tab:
 #endif
-	return True;
+	result = True;
+	break;
     default:
-	return False;
+	result = IsEditKeypad(keysym);
+	break;
     }
+    return result;
 }
 
 #if OPT_MOD_FKEYS
@@ -301,25 +347,42 @@ IsControlAlias(KEY_DATA * kd)
  * would be Home (XK_KP_Home).  The other modifiers work, subject to the
  * usual window-manager assignments.
  */
+#if OPT_SUNPC_KBD
+#define LegacyAllows(code) (!is_legacy || (code & xw->keyboard.modify_now.allow_keys) != 0)
+#else
+#define LegacyAllows(code) True
+#endif
+
 static Bool
 allowModifierParm(XtermWidget xw, KEY_DATA * kd)
 {
     TKeyboard *keyboard = &(xw->keyboard);
     TScreen *screen = TScreenOf(xw);
     int keypad_mode = ((keyboard->flags & MODE_DECKPAM) != 0);
-
+    int is_legacy = (keyboard->type == keyboardIsLegacy);
     Bool result = False;
 
-    (void) screen;
-    if (!(IsKeypadKey(kd->keysym) && keypad_mode)
 #if OPT_SUNPC_KBD
-	&& keyboard->type != keyboardIsVT220
+    if (keyboard->type == keyboardIsVT220)
+	is_legacy = True;
 #endif
+
+    (void) screen;
 #if OPT_VT52_MODE
-	&& screen->vtXX_level != 0
+    if (screen->vtXX_level != 0)
 #endif
-	) {
-	result = True;
+    {
+	if (IsCursorKey(kd->keysym) || IsEditFunctionKey(kd->keysym)) {
+	    result = LegacyAllows(2);
+	} else if (IsKeypadKey(kd->keysym)) {
+	    if (keypad_mode) {
+		result = LegacyAllows(1);
+	    }
+	} else if (IsFunctionKey(kd->keysym)) {
+	    result = LegacyAllows(4);
+	} else if (IsMiscFunctionKey(kd->keysym)) {
+	    result = LegacyAllows(8);
+	}
     }
     return result;
 }
@@ -832,7 +895,7 @@ Input(XtermWidget xw,
     {
 #if OPT_I18N_SUPPORT && OPT_INPUT_METHOD
 	TInput *input = lookupTInput(xw, (Widget) xw);
-	if (input->xic) {
+	if (input && input->xic) {
 	    Status status_return;
 #if OPT_WIDE_CHARS
 	    if (screen->utf8_mode) {
@@ -1996,7 +2059,11 @@ VTInitModifiers(XtermWidget xw)
 			continue;
 
 		    for (l = 0; l < keysyms_per_keycode; ++l) {
+#ifdef HAVE_XKBKEYCODETOKEYSYM
+			keysym = XkbKeycodeToKeysym(dpy, code, 0, l);
+#else
 			keysym = XKeycodeToKeysym(dpy, code, l);
+#endif
 			if (keysym == NoSymbol) {
 			    /* EMPTY */ ;
 			} else if (keysym == XK_Num_Lock) {

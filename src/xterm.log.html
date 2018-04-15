@@ -31,7 +31,7 @@
  * sale, use or other dealings in this Software without prior written        *
  * authorization.                                                            *
  *****************************************************************************
-  $XTermId: xterm.log.html,v 1.1167 2012/05/09 21:21:44 tom Exp $
+  $XTermId: xterm.log.html,v 1.1191 2012/06/24 22:21:33 tom Exp $
   -->
 <HTML>
 <HEAD>
@@ -52,12 +52,13 @@ from the notes that I add when submitting a patch.
 <P>
 You should note that other changes have been made as well, by other people,
 to fix bugs and correct ifdef's for portability.
-Most of these are summarized in the XFree86 CHANGELOG
+Until mid-2006, most of these were summarized in the XFree86 CHANGELOG
 (found in the unbundled tree, xc/programs/Xserver/hw/xfree86).
 <a href="http://invisible-island.net/xterm/xterm.log.html">Here</a>
 is the latest version of this file.
 
 <UL>
+<LI><A HREF="#xterm_280">Patch #280 - 2012/06/24</A>
 <LI><A HREF="#xterm_279">Patch #279 - 2012/05/10</A>
 <LI><A HREF="#xterm_278">Patch #278 - 2012/01/18</A>
 <LI><A HREF="#xterm_277">Patch #277 - 2012/01/07</A>
@@ -339,6 +340,96 @@ is the latest version of this file.
 <LI><A HREF="#xterm_02">Patch #2 - 1996/1/7</A>
 <LI><A HREF="#xterm_01">Patch #1 - 1996/1/6</A>
 </UL>
+
+<H1><A NAME="xterm_280">Patch #280 - 2012/06/24</A></H1>
+<ul>
+	<li>add configure check to work around warning from
+	    desktop-file-install for "Encoding",
+	    noting that it emits deprecation warnings without
+	    providing its version information.
+
+	<li>add configure option
+	    <code>--with-icon-theme</code> to
+	    tell xterm whether to install into an icon theme,
+	    defaulting to "hicolor"
+	    (Redhat #755206, #799614 and #804279).
+
+	<li>change
+	    <code>--with-icondir</code>
+	    to look for "icons" directory rather than "pixmaps" by default.
+	    Add new option
+	    <code>--with-pixmapdir</code>
+	    to allow these two uses to be installed concurrently.
+
+	<li>modify configure options
+	    <code>--with-app-defaults</code> and
+	    <code>--with-icondir</code>
+	    to accept "auto" as value to look for existing directory
+	    from well-known locations.
+
+	<li>add missing codes for secondary DA response which tell the type
+	    of terminal as in the primary DA response.
+
+	<li>update primary DA response for VT420 to include user windows
+	    and horizontal scrolling.
+
+	<li>add <code>modifyKeyboard</code> resource to support
+	    keypad-modifier changes per request by Thomas Wolff
+	    add XK_Home / XK_End to editing-keypad checks
+ 
+	<li>add back-tab key <code>kB</code> to termcap entries to match
+	    the terminfo.
+
+	<li>update terminfo to match corresponding entries in ncurses,
+	    e.g., add <code>XT</code> and adjust <code>sgr</code> string
+	    for xterm-bold entry.
+
+	<li>add configure options to predefine the most commonly customized
+	    resources for terminal-settings, use those to substitute into the
+	    manpage the corresponding compiled-in values: 
+	    <code>altSendsEscape</code>, <code>backarrowKey</code>,
+	    <code>backarrowKeyIsErase</code>, <code>deleteIsDEL</code>,
+	    <code>metaSendsEscape</code> (Redhat #819588).
+
+	<li>change default emulation level to VT420 (discussion with
+	    Ailin Nemui).
+
+	<li>improve logic for DECSCL;
+	    <a href="#xterm_279">patch 279</a>
+	    partly enforced limitation of this to higher-level emulations.
+	    This patch finishes that change.
+
+	<li>improve check for base of combining characters,
+	    preventing combination when cursor movement has intervened.
+	    Mosh's webpage gives two different examples of this,
+	    with other causes ascribed to the behavior.
+
+	<li>modify IL/DL to set cursor to first column on row for better
+	    VT102/VT220 compatibility (prompted by code review of mosh).
+
+	<li>separate state-table entries for DECSC/DECRC from the ANSI.SYS
+	    save/restore cursor, since the latter conflicts with DECSLRM
+	    when DECLRMM is enabled
+	    since <a href="#xterm_279">patch #279</a>
+	    (report/analysis by Ailin Nemui).
+
+	<li>fixes to avoid using <code>SIGCHLD</code> handler of main program
+	    in printer's subprocess (report by Joe Julian).
+
+	<li>correct restore-parameter for mouse-modes from
+	    <a href="#xterm_279">patch #279</a>
+	    changes.
+
+	<li>add null-pointer checks to input-method caching added in
+	    <a href="#xterm_277">patch #277</a>
+	    to fix a problem in the exposure code,
+	    when deselecting a window
+	    (report by Kriston Rehberg).
+
+	<li>unset <code>DESKTOP_STARTUP_ID</code> environment variable to
+	    lessen confusion on the part of GTK applications which use the
+	    variable without checking it (report by John Little).
+</ul>
 
 <H1><A NAME="xterm_279">Patch #279 - 2012/05/10</A></H1>
 <ul>

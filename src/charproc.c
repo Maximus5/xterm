@@ -1,4 +1,4 @@
-/* $XTermId: charproc.c,v 1.1205 2012/05/10 10:51:37 tom Exp $ */
+/* $XTermId: charproc.c,v 1.1220 2012/06/11 08:57:49 tom Exp $ */
 
 /*
  * Copyright 1999-2011,2012 by Thomas E. Dickey
@@ -385,7 +385,7 @@ static XtResource xterm_resources[] =
     Bres(XtNallowTitleOps, XtCAllowTitleOps, screen.allowTitleOp0, DEF_ALLOW_TITLE),
     Bres(XtNallowWindowOps, XtCAllowWindowOps, screen.allowWindowOp0, DEF_ALLOW_WINDOW),
     Bres(XtNaltIsNotMeta, XtCAltIsNotMeta, screen.alt_is_not_meta, False),
-    Bres(XtNaltSendsEscape, XtCAltSendsEscape, screen.alt_sends_esc, False),
+    Bres(XtNaltSendsEscape, XtCAltSendsEscape, screen.alt_sends_esc, DEF_ALT_SENDS_ESC),
     Bres(XtNallowBoldFonts, XtCAllowBoldFonts, screen.allowBoldFonts, True),
     Bres(XtNalwaysBoldMode, XtCAlwaysBoldMode, screen.always_bold_mode, False),
     Bres(XtNalwaysHighlight, XtCAlwaysHighlight, screen.always_highlight, False),
@@ -394,7 +394,7 @@ static XtResource xterm_resources[] =
     Bres(XtNautoWrap, XtCAutoWrap, misc.autoWrap, True),
     Bres(XtNawaitInput, XtCAwaitInput, screen.awaitInput, False),
     Bres(XtNfreeBoldBox, XtCFreeBoldBox, screen.free_bold_box, False),
-    Bres(XtNbackarrowKey, XtCBackarrowKey, screen.backarrow_key, True),
+    Bres(XtNbackarrowKey, XtCBackarrowKey, screen.backarrow_key, DEF_BACKARO_DEL),
     Bres(XtNbellIsUrgent, XtCBellIsUrgent, screen.bellIsUrgent, False),
     Bres(XtNbellOnReset, XtCBellOnReset, screen.bellOnReset, True),
     Bres(XtNboldMode, XtCBoldMode, screen.bold_mode, True),
@@ -419,7 +419,7 @@ static XtResource xterm_resources[] =
     Bres(XtNkeepSelection, XtCKeepSelection, screen.keepSelection, True),
     Bres(XtNloginShell, XtCLoginShell, misc.login_shell, False),
     Bres(XtNmarginBell, XtCMarginBell, screen.marginbell, False),
-    Bres(XtNmetaSendsEscape, XtCMetaSendsEscape, screen.meta_sends_esc, False),
+    Bres(XtNmetaSendsEscape, XtCMetaSendsEscape, screen.meta_sends_esc, DEF_META_SENDS_ESC),
     Bres(XtNmultiScroll, XtCMultiScroll, screen.multiscroll, False),
     Bres(XtNoldXtermFKeys, XtCOldXtermFKeys, screen.old_fkeys, False),
     Bres(XtNpopOnBell, XtCPopOnBell, screen.poponbell, False),
@@ -622,6 +622,8 @@ static XtResource xterm_resources[] =
     CLICK_RES("5", screen.onClick[4], 0),
 
 #if OPT_MOD_FKEYS
+    Ires(XtNmodifyKeyboard, XtCModifyKeyboard,
+	 keyboard.modify_1st.allow_keys, 0),
     Ires(XtNmodifyCursorKeys, XtCModifyCursorKeys,
 	 keyboard.modify_1st.cursor_keys, 2),
     Ires(XtNmodifyFunctionKeys, XtCModifyFunctionKeys,
@@ -1168,6 +1170,9 @@ set_mod_fkeys(XtermWidget xw, int which, int what, Bool enabled)
 	   xw->keyboard.modify_now.field));
 
     switch (which) {
+    case 0:
+	SET_MOD_FKEYS(allow_keys);
+	break;
     case 1:
 	SET_MOD_FKEYS(cursor_keys);
 	break;
@@ -1402,12 +1407,22 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 	 * character sets do not use this feature.  There are some unassigned
 	 * codes at 0x242, but no zero-width characters until past 0x300.
 	 */
-	if (c >= 0x300 && screen->wide_chars
+	if (c >= 0x300
+	    && screen->wide_chars
 	    && my_wcwidth((int) c) == 0
 	    && !isWideControl(c)) {
 	    int prev, test;
+	    Boolean used = True;
+	    int use_row;
+	    int use_col;
 
 	    WriteNow();
+	    use_row = (screen->char_was_written
+		       ? screen->last_written_row
+		       : screen->cur_row);
+	    use_col = (screen->char_was_written
+		       ? screen->last_written_col
+		       : screen->cur_col);
 
 	    /*
 	     * Check if the latest data can be added to the base character.
@@ -1415,11 +1430,8 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 	     * we cannot, since that would change the order.
 	     */
 	    if (screen->normalized_c
-		&& !IsCellCombined(screen,
-				   screen->last_written_row,
-				   screen->last_written_col)) {
-		prev = (int) XTERM_CELL(screen->last_written_row,
-					screen->last_written_col);
+		&& !IsCellCombined(screen, use_row, use_col)) {
+		prev = (int) XTERM_CELL(use_row, use_col);
 		test = do_precomposition(prev, (int) c);
 		TRACE(("do_precomposition (U+%04X [%d], U+%04X [%d]) -> U+%04X [%d]\n",
 		       prev, my_wcwidth(prev),
@@ -1434,20 +1446,23 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 	     * only if it does not change the width of the base character
 	     */
 	    if (test != -1 && my_wcwidth(test) == my_wcwidth(prev)) {
-		putXtermCell(screen,
-			     screen->last_written_row,
-			     screen->last_written_col, test);
+		putXtermCell(screen, use_row, use_col, test);
+	    } else if (screen->char_was_written
+		       || getXtermCell(screen, use_row, use_col) > ' ') {
+		addXtermCombining(screen, use_row, use_col, c);
 	    } else {
-		addXtermCombining(screen,
-				  screen->last_written_row,
-				  screen->last_written_col, c);
+		/*
+		 * none of the above... we will add the combining character as
+		 * a base character.
+		 */
+		used = False;
 	    }
 
-	    if (!screen->scroll_amt)
-		ScrnUpdate(xw,
-			   screen->last_written_row,
-			   screen->last_written_col, 1, 1, 1);
-	    continue;
+	    if (used) {
+		if (!screen->scroll_amt)
+		    ScrnUpdate(xw, use_row, use_col, 1, 1, 1);
+		continue;
+	    }
 	}
 #endif
 
@@ -2011,6 +2026,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 	    TRACE(("CASE_IL - insert line\n"));
 	    if ((row = param[0]) < 1)
 		row = 1;
+	    set_cur_col(screen, ScrnLeftMargin(xw));
 	    InsertLine(xw, row);
 	    ResetState(sp);
 	    break;
@@ -2019,6 +2035,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 	    TRACE(("CASE_DL - delete line\n"));
 	    if ((row = param[0]) < 1)
 		row = 1;
+	    set_cur_col(screen, ScrnLeftMargin(xw));
 	    DeleteLine(xw, row);
 	    ResetState(sp);
 	    break;
@@ -2114,6 +2131,10 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 			reply.a_param[count++] = 8;	/* user-defined-keys */
 		    reply.a_param[count++] = 9;		/* national replacement charsets */
 		    reply.a_param[count++] = 15;	/* technical characters */
+		    if (screen->terminal_id >= 400) {
+			reply.a_param[count++] = 18;	/* windowing capability */
+			reply.a_param[count++] = 21;	/* horizontal scrolling */
+		    }
 		    if_OPT_ISO_COLORS(screen, {
 			reply.a_param[count++] = 22;	/* ANSI color, VT525 */
 		    });
@@ -2136,10 +2157,43 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 		init_reply(ANSI_CSI);
 		reply.a_pintro = '>';
 
-		if (screen->terminal_id >= 200)
-		    reply.a_param[count++] = 1;		/* VT220 */
-		else
+		if (screen->terminal_id >= 200) {
+		    switch (screen->terminal_id) {
+		    case 220:
+		    default:
+			reply.a_param[count++] = 1;	/* VT220 */
+			break;
+		    case 240:
+			/* http://www.decuslib.com/DECUS/vax87a/gendyn/vt200_kind.lis */
+			reply.a_param[count++] = 2;	/* VT240 */
+			break;
+		    case 320:
+			/* http://www.vt100.net/docs/vt320-uu/appendixe.html */
+			reply.a_param[count++] = 24;	/* VT320 */
+			break;
+		    case 330:
+			reply.a_param[count++] = 18;	/* VT330 */
+			break;
+		    case 340:
+			reply.a_param[count++] = 19;	/* VT340 */
+			break;
+		    case 420:
+			reply.a_param[count++] = 41;	/* VT420 */
+			break;
+		    case 510:
+			/* http://www.vt100.net/docs/vt510-rm/DA2 */
+			reply.a_param[count++] = 61;	/* VT510 */
+			break;
+		    case 520:
+			reply.a_param[count++] = 64;	/* VT520 */
+			break;
+		    case 525:
+			reply.a_param[count++] = 65;	/* VT525 */
+			break;
+		    }
+		} else {
 		    reply.a_param[count++] = 0;		/* VT100 (nonstandard) */
+		}
 		reply.a_param[count++] = XTERM_PATCH;	/* Version */
 		reply.a_param[count++] = 0;	/* options (none) */
 		reply.a_nparam = (ParmType) count;
@@ -2152,7 +2206,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 
 	case CASE_DECRPTUI:
 	    TRACE(("CASE_DECRPTUI\n"));
-	    if ((screen->terminal_id >= 400)
+	    if ((screen->vtXX_level >= 4)
 		&& (param[0] <= 0)) {	/* less than means DEFAULT */
 		unparseputc1(xw, ANSI_DCS);
 		unparseputc(xw, '!');
@@ -2604,7 +2658,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 	    ResetState(sp);
 	    break;
 
-	case CASE_DECSC:
+	case CASE_ANSI_SC:
 	    if (IsLeftRightMode(xw)) {
 		int left;
 		int right;
@@ -2621,14 +2675,22 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 		    CursorSet(screen, 0, 0, xw->flags);
 		}
 	    } else {
-		TRACE(("CASE_DECSC - save cursor\n"));
+		TRACE(("CASE_ANSI_SC - save cursor\n"));
 		CursorSave(xw);
-		ResetState(sp);
 	    }
+	    ResetState(sp);
 	    break;
 
+	case CASE_DECSC:
+	    TRACE(("CASE_DECSC - save cursor\n"));
+	    CursorSave(xw);
+	    ResetState(sp);
+	    break;
+
+	case CASE_ANSI_RC:
 	case CASE_DECRC:
-	    TRACE(("CASE_DECRC - restore cursor\n"));
+	    TRACE(("CASE_%sRC - restore cursor\n",
+		   (sp->nextstate == CASE_DECRC) ? "DEC" : "ANSI_"));
 	    CursorRestore(xw);
 	    if_OPT_ISO_COLORS(screen, {
 		setExtendedFG(xw);
@@ -2776,8 +2838,17 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 
 	case CASE_DECSCL:
 	    TRACE(("CASE_DECSCL(%d,%d)\n", param[0], param[1]));
+	    /*
+	     * This changes the emulation level, and is not recognized by
+	     * VT100s.
+	     */
 	    if (screen->terminal_id >= 200) {
-		if (param[0] >= 61 && param[0] <= 65) {
+		/*
+		 * Disallow unrecognized parameters, as well as attempts to set
+		 * the operating level higher than the given terminal-id.
+		 */
+		if (param[0] >= 61
+		    && param[0] <= 60 + (screen->terminal_id / 100)) {
 		    /*
 		     * VT300, VT420, VT520 manuals claim that DECSCL does a
 		     * hard reset (RIS).  VT220 manual states that it is a soft
@@ -3252,7 +3323,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 
 	case CASE_S7C1T:
 	    TRACE(("CASE_S7C1T\n"));
-	    if (screen->terminal_id >= 200) {
+	    if (screen->vtXX_level >= 2) {
 		show_8bit_control(False);
 		ResetState(sp);
 	    }
@@ -3260,7 +3331,7 @@ doparsing(XtermWidget xw, unsigned c, struct ParseState *sp)
 
 	case CASE_S8C1T:
 	    TRACE(("CASE_S8C1T\n"));
-	    if (screen->terminal_id >= 200) {
+	    if (screen->vtXX_level >= 2) {
 #if OPT_VT52_MODE
 		if (screen->vtXX_level <= 1)
 		    break;
@@ -3970,7 +4041,7 @@ PreeditPosition(XtermWidget xw)
     XPoint spot;
     XVaNestedList list;
 
-    if (input->xic
+    if (input && input->xic
 	&& (ld = getLineData(screen, screen->cur_row)) != 0) {
 	spot.x = (short) LineCursorX(screen, ld, screen->cur_col);
 	spot.y = (short) (CursorY(screen, screen->cur_row) + xw->misc.xim_fs_ascent);
@@ -4116,6 +4187,14 @@ dotext(XtermWidget xw,
 	next_col += width_here;
 	screen->do_wrap = need_wrap;
     }
+
+    /*
+     * Remember that we wrote something to the screen, for use as a base of
+     * combining characters.  The logic above may have called cursor-forward
+     * or carriage-return operations which resets this flag, so we set it at
+     * the very end.
+     */
+    screen->char_was_written = True;
 #else /* ! OPT_WIDE_CHARS */
 
     for (offset = 0; offset < len; offset += (Cardinal) this_col) {
@@ -4232,7 +4311,7 @@ HandleStructNotify(Widget w GCC_UNUSED,
 			       save.menu_border));
 
 			/*
-			 * Window manager still may be using the old values. 
+			 * Window manager still may be using the old values.
 			 * Try to fool it.
 			 */
 			REQ_RESIZE((Widget) xw,
@@ -4489,7 +4568,7 @@ dpmodes(XtermWidget xw, BitFunc func)
 		    RequestResize(xw, -1, j, True);
 		(*func) (&xw->flags, IN132COLUMNS);
 		if (xw->flags & IN132COLUMNS) {
-		    xw->flags &= ~LEFT_RIGHT;
+		    UIntClr(xw->flags, LEFT_RIGHT);
 		    reset_lr_margins(screen);
 		}
 	    }
@@ -4654,7 +4733,7 @@ dpmodes(XtermWidget xw, BitFunc func)
 	    update_decbkm();
 	    break;
 	case srm_DECLRMM:
-	    if (screen->terminal_id >= 400) {	/* VT420 */
+	    if (screen->vtXX_level >= 4) {	/* VT420 */
 		(*func) (&xw->flags, LEFT_RIGHT);
 		if (IsLeftRightMode(xw)) {
 		    xterm_ResetDouble(xw);
@@ -4665,7 +4744,7 @@ dpmodes(XtermWidget xw, BitFunc func)
 	    }
 	    break;
 	case srm_DECNCSM:
-	    if (screen->terminal_id >= 500) {	/* VT510 */
+	    if (screen->vtXX_level >= 5) {	/* VT510 */
 		(*func) (&xw->flags, NOCLEAR_COLM);
 	    }
 	    break;
@@ -5104,8 +5183,9 @@ restoremodes(XtermWidget xw)
 	    break;
 	case srm_X10_MOUSE:	/* MIT bogus sequence           */
 	    DoRM0(DP_X_X10MSE, screen->send_mouse_pos);
-	    really_set_mousemode(xw, screen->send_mouse_pos,
-				 screen->send_mouse_pos != MOUSE_OFF);
+	    really_set_mousemode(xw,
+				 screen->send_mouse_pos != MOUSE_OFF,
+				 screen->send_mouse_pos);
 	    break;
 #if OPT_TOOLBAR
 	case srm_RXVT_TOOLBAR:
@@ -5146,7 +5226,7 @@ restoremodes(XtermWidget xw)
 	    if (!(screen->inhibit & I_TEK) &&
 		(TEK4014_ACTIVE(xw) != (Boolean) screen->save_modes[DP_DECTEK])) {
 		FlushLog(xw);
-		TEK4014_ACTIVE(xw) = screen->save_modes[DP_DECTEK];
+		TEK4014_ACTIVE(xw) = (Boolean) screen->save_modes[DP_DECTEK];
 	    }
 	    break;
 #endif
@@ -5223,8 +5303,9 @@ restoremodes(XtermWidget xw)
 	case srm_BTN_EVENT_MOUSE:
 	case srm_ANY_EVENT_MOUSE:
 	    DoRM0(DP_X_MOUSE, screen->send_mouse_pos);
-	    really_set_mousemode(xw, screen->send_mouse_pos,
-				 screen->send_mouse_pos != MOUSE_OFF);
+	    really_set_mousemode(xw,
+				 screen->send_mouse_pos != MOUSE_OFF,
+				 screen->send_mouse_pos);
 	    break;
 #if OPT_FOCUS_EVENT
 	case srm_FOCUS_EVENT_MOUSE:
@@ -7412,6 +7493,7 @@ VTInitialize(Widget wrequest,
     wnew->initflags = wnew->flags;
 
 #if OPT_MOD_FKEYS
+    init_Ires(keyboard.modify_1st.allow_keys);
     init_Ires(keyboard.modify_1st.cursor_keys);
     init_Ires(keyboard.modify_1st.function_keys);
     init_Ires(keyboard.modify_1st.keypad_keys);
@@ -7458,7 +7540,7 @@ releaseWindowGCs(XtermWidget xw, VTwin * win)
 #define TRACE_FREE_LEAK(name) \
 	if (name) { \
 	    free((void *) name); \
-	    TRACE(("freed " #name ": %p\n", name)); \
+	    TRACE(("freed " #name ": %p\n", (const void *) name)); \
 	    name = 0; \
 	}
 
@@ -7474,7 +7556,7 @@ cleanupInputMethod(XtermWidget xw)
 {
     TInput *input = lookupTInput(xw, (Widget) xw);
 
-    if (input->xim) {
+    if (input && input->xim) {
 	XCloseIM(input->xim);
 	input->xim = 0;
 	TRACE(("freed screen->xim\n"));
@@ -8001,7 +8083,7 @@ VTRealize(Widget w,
 	screen->saveBuf_index = NULL;
     }
 
-    screen->do_wrap = False;
+    ResetWrap(screen);
     screen->scrolls = screen->incopy = 0;
     xtermSetCursorBox(screen);
 
@@ -8051,8 +8133,8 @@ xim_destroy_cb(XIM im GCC_UNUSED,
 
     TRACE(("xim_destroy_cb im=%lx, client=%p, call=%p\n",
 	   (long) im, client_data, call_data));
-
-    input->xic = NULL;
+    if (input)
+	input->xic = NULL;
     XRegisterIMInstantiateCallback(XtDisplay(xw), NULL, NULL, NULL,
 				   xim_instantiate_cb, NULL);
 }

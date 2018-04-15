@@ -1,4 +1,4 @@
-/* $XTermId: ptyx.h,v 1.730 2012/05/09 00:09:32 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.735 2012/06/24 18:45:38 tom Exp $ */
 
 /*
  * Copyright 1999-2011,2012 by Thomas E. Dickey
@@ -67,7 +67,11 @@
 #include <X11/Shell.h>		/* for XtNdieCallback, etc. */
 #include <X11/StringDefs.h>	/* for standard resource names */
 #include <X11/Xmu/Misc.h>	/* For Max() and Min(). */
+
+#undef bcopy
+#undef bzero
 #include <X11/Xfuncs.h>
+
 #include <X11/Xosdefs.h>
 #include <X11/Xmu/Converters.h>
 #ifdef XRENDERFONT
@@ -364,7 +368,7 @@ typedef struct {
 #define MAX_DECID 525			/* ...through VT525 */
 
 #ifndef DFT_DECID
-#define DFT_DECID "vt100"		/* default VT100 */
+#define DFT_DECID "vt420"		/* default VT420 */
 #endif
 
 #ifndef DFT_KBD_DIALECT
@@ -392,7 +396,7 @@ typedef short ParmType;
 typedef struct {
 	Char		a_type;		/* CSI, etc., see unparseq()	*/
 	Char		a_pintro;	/* private-mode char, if any	*/
-	char *		a_delim;	/* between parameters (;)	*/
+	const char *	a_delim;	/* between parameters (;)	*/
 	Char		a_inters;	/* special (before final-char)	*/
 	Char		a_final;	/* final-char			*/
 	ParmType	a_nparam;	/* # of parameters		*/
@@ -1655,6 +1659,7 @@ typedef struct {
 	int		unicode_font;	/* font uses unicode encoding	*/
 	int		utf_count;	/* state of utf_char		*/
 	IChar		utf_char;	/* in-progress character	*/
+	Boolean		char_was_written;
 	int		last_written_col;
 	int		last_written_row;
 	TypedBuffer(XChar2b);
@@ -2129,6 +2134,20 @@ typedef struct _TekScreen {
 #define SCREEN_FLAG(screenp,f)		(0)
 #endif
 
+/*
+ * After screen-updates, reset the flag that tells us we should do wrapping.
+ * Likewise, reset (in wide-character mode) the flag that tells us where the
+ * "previous" character was written.
+ */
+#if OPT_WIDE_CHARS
+#define ResetWrap(screen) \
+    (screen)->do_wrap = \
+    (screen)->char_was_written = False
+#else
+#define ResetWrap(screen) \
+    (screen)->do_wrap = False
+#endif
+
 /* meaning of bits in screen.select flag */
 #define	INWINDOW	01	/* the mouse is in one of the windows */
 #define	FOCUS		02	/* one of the windows is the focus window */
@@ -2222,6 +2241,7 @@ extern	const char * visibleKeyboardType(xtermKeyboardType);
 
 typedef struct
 {
+    int allow_keys;		/* how to handle legacy/vt220 keyboard */
     int cursor_keys;		/* how to handle cursor-key modifiers */
     int function_keys;		/* how to handle function-key modifiers */
     int keypad_keys;		/* how to handle keypad key-modifiers */
