@@ -1,4 +1,4 @@
-/* $XTermId: misc.c,v 1.493 2010/04/18 17:51:44 tom Exp $ */
+/* $XTermId: misc.c,v 1.499 2010/06/04 01:02:08 tom Exp $ */
 
 /*
  * Copyright 1999-2009,2010 by Thomas E. Dickey
@@ -127,7 +127,7 @@ static char *
 Readlink(const char *filename)
 {
     char *buf = NULL;
-    unsigned size = 100;
+    size_t size = 100;
     int n;
 
     for (;;) {
@@ -373,19 +373,23 @@ xevents(void)
     /*
      * process timeouts, relying on the fact that XtAppProcessEvent
      * will process the timeout and return without blockng on the
-     * XEvent queue.  Other sources i.e. the pty are handled elsewhere
+     * XEvent queue.  Other sources i.e., the pty are handled elsewhere
      * with select().
      */
-    while ((input_mask = XtAppPending(app_con)) & XtIMTimer)
-	XtAppProcessEvent(app_con, XtIMTimer);
+    while ((input_mask = XtAppPending(app_con)) != 0) {
+	if (input_mask & XtIMTimer)
+	    XtAppProcessEvent(app_con, (XtInputMask) XtIMTimer);
 #if OPT_SESSION_MGT
-    /*
-     * Session management events are alternative input events. Deal with
-     * them in the same way.
-     */
-    while ((input_mask = XtAppPending(app_con)) & XtIMAlternateInput)
-	XtAppProcessEvent(app_con, XtIMAlternateInput);
+	/*
+	 * Session management events are alternative input events. Deal with
+	 * them in the same way.
+	 */
+	else if (input_mask & XtIMAlternateInput)
+	    XtAppProcessEvent(app_con, (XtInputMask) XtIMAlternateInput);
 #endif
+	else
+	    break;
+    }
 
     /*
      * If there's no XEvents, don't wait around...
@@ -445,6 +449,7 @@ xevents(void)
 		case Expose:
 		case NoExpose:
 		case PropertyNotify:
+		case ClientMessage:
 		    break;
 		default:
 		    xtermShowPointer(xw, True);
@@ -454,7 +459,7 @@ xevents(void)
 
 	    XtDispatchEvent(&event);
 	}
-    } while ((input_mask = XtAppPending(app_con)) & XtIMXEvent);
+    } while (XtAppPending(app_con) & XtIMXEvent);
 }
 
 static Cursor
@@ -592,8 +597,8 @@ HandleSpawnTerminal(Widget w GCC_UNUSED,
      */
     child_exe = Readlink(PROCFS_ROOT "/self/exe");
     if (!child_exe) {
-	if (strncmp(ProgramName, "./", 2)
-	    && strncmp(ProgramName, "../", 3)) {
+	if (strncmp(ProgramName, "./", (size_t) 2)
+	    && strncmp(ProgramName, "../", (size_t) 3)) {
 	    child_exe = xtermFindShell(ProgramName, True);
 	} else {
 	    fprintf(stderr, "Cannot exec-xterm given %s\n", ProgramName);
@@ -1099,7 +1104,11 @@ dabbrev_expand(TScreen * screen)
 		    screen->dabbrev_working = True;
 		    /* we are in the middle of dabbrev process */
 		}
+	    } else {
+		return result;
 	    }
+	} else {
+	    return result;
 	}
 	if (!screen->dabbrev_working) {
 	    if (lastexpansion != 0) {
@@ -1108,8 +1117,10 @@ dabbrev_expand(TScreen * screen)
 	    }
 	    return result;
 	}
-    } else {
     }
+
+    if (dabbrev_hint == 0)
+	return result;
 
     hint_len = strlen(dabbrev_hint);
     for (;;) {
@@ -2190,7 +2201,7 @@ ManipulateSelectionData(XtermWidget xw, TScreen * screen, char *buf, int final)
 		screen->base64_final = final;
 
 		/* terminator will be written in this call */
-		xtermGetSelection((Widget) xw, 0, select_args, n, NULL);
+		xtermGetSelection((Widget) xw, (Time) 0, select_args, n, NULL);
 	    }
 	} else {
 	    if (AllowWindowOps(xw, ewSetSelection)) {
@@ -3474,11 +3485,11 @@ ChangeGroup(XtermWidget xw, const char *attribute, char *value)
 	/* If the attribute isn't going to change, then don't bother... */
 
 	if (resource.sameName) {
-	    char *buf;
+	    char *buf = 0;
 	    XtSetArg(args[0], my_attr, &buf);
 	    XtGetValues(top, args, 1);
 	    TRACE(("...comparing{%s}\n", buf));
-	    if (strcmp(name, buf) == 0)
+	    if (buf != 0 && strcmp(name, buf) == 0)
 		changed = False;
 	}
 #endif /* OPT_SAME_NAME */
@@ -3709,7 +3720,6 @@ SysReasonMsg(int code)
 	{ ERROR_INIT,		"spawn: can't initialize window" },
 	{ ERROR_TIOCKSET,	"spawn: ioctl() failed on TIOCKSET" },
 	{ ERROR_TIOCKSETC,	"spawn: ioctl() failed on TIOCKSETC" },
-	{ ERROR_SPREALLOC,	"spawn: realloc of ttydev failed" },
 	{ ERROR_LUMALLOC,	"luit: command-line malloc failed" },
 	{ ERROR_SELECT,		"in_put: select() failed" },
 	{ ERROR_VINIT,		"VTInit: can't initialize window" },
@@ -3785,7 +3795,7 @@ Cleanup(int code)
 	if (resource.sessionMgt) {
 	    XtVaSetValues(toplevel,
 			  XtNjoinSession, False,
-			  (XtPointer *) 0);
+			  NULL);
 	}
 #endif
     }
@@ -4032,22 +4042,27 @@ set_tek_visibility(Bool on)
     TRACE(("set_tek_visibility(%d)\n", on));
 
     if (on) {
-	if (!TEK4014_SHOWN(term) && (tekWidget || TekInit())) {
-	    Widget tekParent = SHELL_OF(tekWidget);
-	    XtRealizeWidget(tekParent);
-	    XtMapWidget(XtParent(tekWidget));
+	if (!TEK4014_SHOWN(term)) {
+	    if (tekWidget == 0) {
+		TekInit();	/* will exit on failure */
+	    }
+	    if (tekWidget != 0) {
+		Widget tekParent = SHELL_OF(tekWidget);
+		XtRealizeWidget(tekParent);
+		XtMapWidget(XtParent(tekWidget));
 #if OPT_TOOLBAR
-	    /* we need both of these during initialization */
-	    XtMapWidget(tekParent);
-	    XtMapWidget(tekWidget);
+		/* we need both of these during initialization */
+		XtMapWidget(tekParent);
+		XtMapWidget(tekWidget);
 #endif
-	    XtOverrideTranslations(tekParent,
-				   XtParseTranslationTable
-				   ("<Message>WM_PROTOCOLS: DeleteWindow()"));
-	    (void) XSetWMProtocols(XtDisplay(tekParent),
-				   XtWindow(tekParent),
-				   &wm_delete_window, 1);
-	    TEK4014_SHOWN(term) = True;
+		XtOverrideTranslations(tekParent,
+				       XtParseTranslationTable
+				       ("<Message>WM_PROTOCOLS: DeleteWindow()"));
+		(void) XSetWMProtocols(XtDisplay(tekParent),
+				       XtWindow(tekParent),
+				       &wm_delete_window, 1);
+		TEK4014_SHOWN(term) = True;
+	    }
 	}
     } else {
 	if (TEK4014_SHOWN(term) && tekWidget) {
@@ -4156,9 +4171,11 @@ sortedOptDescs(XrmOptionDescRec * descs, Cardinal res_count)
 
 	/* make a sorted index to 'resources' */
 	res_array = TypeCallocN(XrmOptionDescRec, res_count);
-	for (j = 0; j < res_count; j++)
-	    res_array[j] = descs[j];
-	qsort(res_array, (size_t) res_count, sizeof(*res_array), cmp_resources);
+	if (res_array != 0) {
+	    for (j = 0; j < res_count; j++)
+		res_array[j] = descs[j];
+	    qsort(res_array, (size_t) res_count, sizeof(*res_array), cmp_resources);
+	}
     }
     return res_array;
 }

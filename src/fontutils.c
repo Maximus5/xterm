@@ -1,4 +1,4 @@
-/* $XTermId: fontutils.c,v 1.340 2010/04/18 16:48:46 tom Exp $ */
+/* $XTermId: fontutils.c,v 1.342 2010/06/04 22:43:49 tom Exp $ */
 
 /************************************************************
 
@@ -749,7 +749,7 @@ xtermOpenFont(XtermWidget xw,
 	if ((result->fs = XLoadQueryFont(screen->display, name)) != 0) {
 	    code = True;
 	    if (EmptyFont(result->fs)) {
-		result = xtermCloseFont(xw, result);
+		(void) xtermCloseFont(xw, result);
 		code = False;
 	    } else {
 		result->fn = x_strdup(name);
@@ -2382,10 +2382,9 @@ xtermDrawBoxChar(XtermWidget xw,
 	unsigned n;
 	for (n = 1; n < 32; n++) {
 	    if (dec2ucs(n) == ch
-		&& !IsXtermMissingChar(screen, n,
-				       ((flags & BOLD)
-					? &screen->fnts[fBold]
-					: &screen->fnts[fNorm]))) {
+		&& !((flags & BOLD)
+		     ? IsXtermMissingChar(screen, n, &screen->fnts[fBold])
+		     : IsXtermMissingChar(screen, n, &screen->fnts[fNorm]))) {
 		TRACE(("...use xterm-style linedrawing\n"));
 		ch = n;
 		break;

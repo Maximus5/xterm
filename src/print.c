@@ -1,4 +1,4 @@
-/* $XTermId: print.c,v 1.116 2010/04/05 00:11:13 tom Exp $ */
+/* $XTermId: print.c,v 1.118 2010/06/04 09:45:23 tom Exp $ */
 
 /************************************************************
 
@@ -186,8 +186,10 @@ printLine(XtermWidget xw, int row, unsigned chr, PrinterFlags * p)
 		)
 		&& ch) {
 		attr = CharOf(ld->attribs[col] & SGR_MASK);
+#if OPT_PRINT_COLORS
 		last_fg = fg;
 		last_bg = bg;
+#endif
 		if (p->print_attributes)
 		    send_SGR(xw, attr, fg, bg);
 	    }
@@ -405,7 +407,7 @@ charToPrinter(XtermWidget xw, unsigned chr)
 	    SysError(ERROR_FORK);
 
 	if (Printer_pid == 0) {
-	    TRACE(((char *) 0));
+	    TRACE_CLOSE();
 	    close(my_pipe[1]);	/* printer is silent */
 	    close(screen->respond);
 
