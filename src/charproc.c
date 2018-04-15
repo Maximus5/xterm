@@ -1,4 +1,4 @@
-/* $XTermId: charproc.c,v 1.1359 2014/06/03 23:38:02 tom Exp $ */
+/* $XTermId: charproc.c,v 1.1363 2014/06/13 00:53:14 tom Exp $ */
 
 /*
  * Copyright 1999-2013,2014 by Thomas E. Dickey
@@ -7734,7 +7734,10 @@ VTInitialize(Widget wrequest,
     init_Ires(screen.border);
     init_Bres(screen.jumpscroll);
     init_Bres(screen.fastscroll);
+
     init_Bres(screen.old_fkeys);
+    wnew->screen.old_fkeys0 = wnew->screen.old_fkeys;
+
     init_Bres(screen.delete_is_del);
     initializeKeyboardType(wnew);
 #ifdef ALLOWLOGGING
@@ -7784,6 +7787,8 @@ VTInitialize(Widget wrequest,
     TScreenOf(wnew)->vtXX_level = (TScreenOf(wnew)->terminal_id / 100);
 
     init_Ires(screen.title_modes);
+    wnew->screen.title_modes0 = wnew->screen.title_modes;
+
     init_Bres(screen.visualbell);
     init_Bres(screen.flash_line);
     init_Ires(screen.visualBellDelay);
@@ -7837,6 +7842,7 @@ VTInitialize(Widget wrequest,
 
     TScreenOf(wnew)->pointer_cursor = TScreenOf(request)->pointer_cursor;
     init_Ires(screen.pointer_mode);
+    wnew->screen.pointer_mode0 = wnew->screen.pointer_mode;
 
     init_Sres(screen.answer_back);
 
@@ -8545,7 +8551,9 @@ VTDestroy(Widget w GCC_UNUSED)
 	XFreeCursor(screen->display, screen->hidden_cursor);
 
     xtermCloseFonts(xw, screen->fnts);
+#if OPT_WIDE_ATTRS
     xtermCloseFonts(xw, screen->ifnts);
+#endif
     noleaks_cachedCgs(xw);
 
     TRACE_FREE_LEAK(screen->selection_targets_8bit);
@@ -8615,6 +8623,7 @@ VTDestroy(Widget w GCC_UNUSED)
     TRACE_FREE_LEAK(xw->misc.default_font.f_wb);
 #endif
 
+#if OPT_LOAD_VTFONTS || OPT_WIDE_CHARS
     for (n = 0; n < NMENUFONTS; ++n) {
 	for (k = 0; k < fMAX; ++k) {
 	    if (screen->menu_font_names[n][k] !=
@@ -8626,6 +8635,7 @@ VTDestroy(Widget w GCC_UNUSED)
 	    }
 	}
     }
+#endif
 
 #if OPT_SELECT_REGEX
     for (n = 0; n < NSELECTUNITS; ++n) {
@@ -9929,6 +9939,28 @@ ShowCursor(void)
 	    XDrawLines(screen->display, VWindow(screen), outlineGC,
 		       screen->box, NBOX, CoordModePrevious);
 	} else {
+#if OPT_WIDE_ATTRS
+	    int italics_on = ((ld->attribs[cursor_col] & ATR_ITALIC) != 0);
+	    int italics_off = ((xw->flags & ATR_ITALIC) != 0);
+	    int fix_italics = (italics_on != italics_off);
+	    int which_font = (xw->flags & BOLD ? fBold : fNorm);
+
+	    if_OPT_WIDE_CHARS(screen, {
+		if (isWide((int) base)) {
+		    which_font = (xw->flags & BOLD ? fWBold : fWide);
+		}
+	    });
+
+	    if (fix_italics) {
+		xtermLoadItalics(xw);
+		if (italics_on) {
+		    setCgsFont(xw, currentWin, currentCgs, &screen->ifnts[which_font]);
+		} else {
+		    setCgsFont(xw, currentWin, currentCgs, &screen->fnts[which_font]);
+		}
+	    }
+	    currentGC = getCgsGC(xw, currentWin, currentCgs);
+#endif /* OPT_WIDE_ATTRS */
 
 	    drawXtermText(xw,
 			  flags & DRAWX_MASK,
@@ -9959,6 +9991,15 @@ ShowCursor(void)
 		XDrawLines(screen->display, VDrawable(screen), outlineGC,
 			   screen->box, NBOX, CoordModePrevious);
 	    }
+#if OPT_WIDE_ATTRS
+	    if (fix_italics) {
+		if (italics_on) {
+		    setCgsFont(xw, currentWin, currentCgs, &screen->fnts[which_font]);
+		} else {
+		    setCgsFont(xw, currentWin, currentCgs, &screen->ifnts[which_font]);
+		}
+	    }
+#endif
 	}
     }
     screen->cursor_state = ON;
@@ -9986,6 +10027,10 @@ HideCursor(void)
 #endif
     int cursor_col;
     LineData *ld = 0;
+#if OPT_WIDE_ATTRS
+    unsigned attr_flags;
+    int which_font = fNorm;
+#endif
 
     if (screen->cursor_state == OFF)
 	return;
@@ -10060,6 +10105,24 @@ HideCursor(void)
     else
 	in_selection = True;
 
+#if OPT_WIDE_ATTRS
+    attr_flags = ld->attribs[cursor_col];
+    if ((attr_flags & ATR_ITALIC) ^ (xw->flags & ATR_ITALIC)) {
+	which_font = (attr_flags & BOLD ? fBold : fNorm);
+
+	if_OPT_WIDE_CHARS(screen, {
+	    if (isWide((int) base)) {
+		which_font = (attr_flags & BOLD ? fWBold : fWide);
+	    }
+	});
+	setCgsFont(xw, WhichVWin(screen),
+		   whichXtermCgs(xw, attr_flags, in_selection),
+		   ((attr_flags & ATR_ITALIC)
+		    ? &screen->ifnts[which_font]
+		    : &screen->fnts[which_font]));
+    }
+#endif
+
     currentGC = updatedXtermGC(xw, flags, fg_bg, in_selection);
 
     TRACE(("HideCursor calling drawXtermText cur(%d,%d)\n",
@@ -10091,6 +10154,16 @@ HideCursor(void)
     });
 #endif
     screen->cursor_state = OFF;
+
+#if OPT_WIDE_ATTRS
+    if ((attr_flags & ATR_ITALIC) ^ (xw->flags & ATR_ITALIC)) {
+	setCgsFont(xw, WhichVWin(screen),
+		   whichXtermCgs(xw, xw->flags, in_selection),
+		   ((xw->flags & ATR_ITALIC)
+		    ? &screen->ifnts[which_font]
+		    : &screen->fnts[which_font]));
+    }
+#endif
     resetXtermGC(xw, flags, in_selection);
 
     refresh_displayed_graphics(screen,
@@ -10335,7 +10408,10 @@ ReallyReset(XtermWidget xw, Bool full, Bool saved)
 
 	TabReset(xw->tabs);
 	xw->keyboard.flags = MODE_SRM;
+
+	screen->old_fkeys = screen->old_fkeys0;
 	initializeKeyboardType(xw);
+
 #if OPT_INITIAL_ERASE
 	if (xw->keyboard.reset_DECBKM == 1)
 	    xw->keyboard.flags |= MODE_DECBKM;
@@ -10349,8 +10425,8 @@ ReallyReset(XtermWidget xw, Bool full, Bool saved)
 #if OPT_SCROLL_LOCK
 	xtermClearLEDs(screen);
 #endif
-	screen->title_modes = DEF_TITLE_MODES;
-	screen->pointer_mode = DEF_POINTER_MODE;
+	screen->title_modes = screen->title_modes0;
+	screen->pointer_mode = screen->pointer_mode0;
 #if OPT_SIXEL_GRAPHICS
 	if (TScreenOf(xw)->sixel_scrolling)
 	    xw->keyboard.flags |= MODE_DECSDM;

@@ -1,4 +1,4 @@
-/* $XTermId: screen.c,v 1.496 2014/05/26 17:54:45 tom Exp $ */
+/* $XTermId: screen.c,v 1.499 2014/06/11 18:40:34 tom Exp $ */
 
 /*
  * Copyright 1999-2013,2014 by Thomas E. Dickey
@@ -62,7 +62,7 @@
 
 #include <X11/Xatom.h>
 
-#if OPT_WIDE_CHARS
+#if OPT_WIDE_ATTRS || OPT_WIDE_CHARS
 #include <fontutils.h>
 #endif
 
@@ -1423,7 +1423,7 @@ ScrnRefresh(XtermWidget xw,
 #endif
     static int recurse = 0;
 #if OPT_WIDE_ATTRS
-    unsigned old_attrs = 0;
+    unsigned old_attrs = xw->flags;
 #endif
 
     TRACE(("ScrnRefresh top %d (%d,%d) - (%d,%d)%s {{\n",
@@ -1766,6 +1766,9 @@ ScrnRefresh(XtermWidget xw,
      * screen foreground and background so that other functions (e.g.,
      * ClearRight) will get the correct colors.
      */
+#if OPT_WIDE_ATTRS
+    (void) refreshFontGCs(xw, xw->flags, old_attrs);
+#endif
     if_OPT_ISO_COLORS(screen, {
 	if (gc_changes & FG_COLOR)
 	    SGR_Foreground(xw, xw->cur_foreground);
