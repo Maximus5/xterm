@@ -1,4 +1,4 @@
-/* $XTermId: main.c,v 1.773 2015/08/26 23:39:36 tom Exp $ */
+/* $XTermId: main.c,v 1.776 2015/12/29 15:19:35 tom Exp $ */
 
 /*
  * Copyright 2002-2014,2015 by Thomas E. Dickey
@@ -1947,6 +1947,23 @@ setEffectiveUser(uid_t user)
 #endif
 #endif /* HAVE_POSIX_SAVED_IDS */
 
+#if OPT_LUIT_PROG
+static Boolean
+complex_command(char **args)
+{
+    Boolean result = False;
+    if (x_countargv(args) == 1) {
+	char *check = xtermFindShell(args[0], False);
+	if (check == 0) {
+	    result = True;
+	} else {
+	    free(check);
+	}
+    }
+    return result;
+}
+#endif
+
 int
 main(int argc, char *argv[]ENVP_ARG)
 {
@@ -2448,10 +2465,15 @@ main(int argc, char *argv[]ENVP_ARG)
 	}
 	command_length_with_luit = x_countargv(command_to_exec_with_luit);
 	if (count_exec) {
+	    static char *fixup_shell[] =
+	    {"sh", "-c", 0};
 	    char *delimiter[2];
 	    delimiter[0] = x_strdup("--");
 	    delimiter[1] = 0;
 	    x_appendargv(command_to_exec_with_luit, delimiter);
+	    if (complex_command(command_to_exec)) {
+		x_appendargv(command_to_exec_with_luit, fixup_shell);
+	    }
 	    x_appendargv(command_to_exec_with_luit, command_to_exec);
 	}
 	TRACE_ARGV("luit command", command_to_exec_with_luit);
@@ -2628,6 +2650,10 @@ get_pty(int *pty, char *from GCC_UNUSED)
 
 #if defined(USE_OPENPTY)
     result = openpty(pty, &opened_tty, ttydev, NULL, NULL);
+    if (opened_tty >= 0) {
+	close(opened_tty);
+	opened_tty = -1;
+    }
 #elif defined(HAVE_POSIX_OPENPT) && defined(HAVE_PTSNAME) && defined(HAVE_GRANTPT_PTY_ISATTY)
     if ((*pty = posix_openpt(O_RDWR)) >= 0) {
 	char *name = ptsname(*pty);
@@ -2783,12 +2809,6 @@ get_pty(int *pty, char *from)
 	seteuid(save_ruid);
 	TRACE_IDS;
 
-#ifdef USE_OPENPTY
-	if (opened_tty >= 0) {
-	    close(opened_tty);
-	    opened_tty = -1;
-	}
-#endif
     } else if (m_pty != -1) {
 	*pty = m_pty;
 	result = 0;
@@ -2800,6 +2820,12 @@ get_pty(int *pty, char *from)
 	   ptydev != 0 ? ptydev : "?",
 	   result ? "FAIL" : "OK",
 	   pty != 0 ? *pty : -1));
+#ifdef USE_OPENPTY
+    if (opened_tty >= 0) {
+	close(opened_tty);
+	opened_tty = -1;
+    }
+#endif
     return result;
 }
 #endif
@@ -3223,6 +3249,7 @@ validShell(const char *pathname)
 	&& stat(ok_shells, &sb) == 0
 	&& (sb.st_mode & S_IFMT) == S_IFREG
 	&& (sb.st_size != 0)
+	&& (sb.st_size < (off_t) (((size_t) ~0) - 2))
 	&& (blob = calloc((size_t) sb.st_size + 2, sizeof(char))) != 0) {
 	if ((fp = fopen(ok_shells, "r")) != 0) {
 	    rc = fread(blob, sizeof(char), (size_t) sb.st_size, fp);
