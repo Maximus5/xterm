@@ -1,4 +1,4 @@
-dnl $XTermId: aclocal.m4,v 1.413 2017/05/02 23:45:28 tom Exp $
+dnl $XTermId: aclocal.m4,v 1.417 2017/12/24 22:48:59 tom Exp $
 dnl
 dnl ---------------------------------------------------------------------------
 dnl
@@ -264,7 +264,7 @@ ifelse([$3],,[    :]dnl
 ])dnl
 ])])dnl
 dnl ---------------------------------------------------------------------------
-dnl CF_CC_ENV_FLAGS version: 7 updated: 2017/02/25 18:57:40
+dnl CF_CC_ENV_FLAGS version: 8 updated: 2017/09/23 08:50:24
 dnl ---------------
 dnl Check for user's environment-breakage by stuffing CFLAGS/CPPFLAGS content
 dnl into CC.  This will not help with broken scripts that wrap the compiler
@@ -288,7 +288,7 @@ case "$CC" in
 	AC_MSG_WARN(your environment misuses the CC variable to hold CFLAGS/CPPFLAGS options)
 	# humor him...
 	cf_prog=`echo "$CC" | sed -e 's/	/ /g' -e 's/[[ ]]* / /g' -e 's/[[ ]]*[[ ]]-[[^ ]].*//'`
-	cf_flags=`echo "$CC" | ${AWK:-awk} -v prog="$cf_prog" '{ printf("%s", substr([$]0,1+length(prog))); }'`
+	cf_flags=`echo "$CC" | ${AWK:-awk} -v prog="$cf_prog" '{ printf("%s", [substr]([$]0,1+length(prog))); }'`
 	CC="$cf_prog"
 	for cf_arg in $cf_flags
 	do
@@ -3597,9 +3597,13 @@ else
 fi
 ])dnl
 dnl ---------------------------------------------------------------------------
-dnl CF_WITH_MAN2HTML version: 5 updated: 2015/08/20 04:51:36
+dnl CF_WITH_MAN2HTML version: 6 updated: 2017/12/24 17:45:28
 dnl ----------------
-dnl Check for man2html and groff.  Optionally prefer man2html over groff.
+dnl Check for man2html and groff.  Prefer man2html over groff, but use groff
+dnl as a fallback.  See
+dnl
+dnl		http://invisible-island.net/scripts/man2html.html
+dnl
 dnl Generate a shell script which hides the differences between the two.
 dnl
 dnl We name that "man2html.tmp".
@@ -3608,11 +3612,35 @@ dnl The shell script can be removed later, e.g., using "make distclean".
 AC_DEFUN([CF_WITH_MAN2HTML],[
 AC_REQUIRE([CF_PROG_GROFF])
 
+case "x${with_man2html}" in
+(xno)
+	cf_man2html=no
+	;;
+(x|xyes)
+	AC_PATH_PROG(cf_man2html,man2html,no)
+	case "x$cf_man2html" in
+	(x/*)
+		AC_MSG_CHECKING(for the modified Earl Hood script)
+		if ( $cf_man2html -help 2>&1 | grep 'Make an index of headers at the end' >/dev/null )
+		then
+			cf_man2html_ok=yes
+		else
+			cf_man2html=no
+			cf_man2html_ok=no
+		fi
+		AC_MSG_RESULT($cf_man2html_ok)
+		;;
+	(*)
+		cf_man2html=no
+		;;
+	esac
+esac
+
 AC_MSG_CHECKING(for program to convert manpage to html)
 AC_ARG_WITH(man2html,
 	[  --with-man2html=XXX     use XXX rather than groff],
 	[cf_man2html=$withval],
-	[cf_man2html=$GROFF_PATH])
+	[cf_man2html=$cf_man2html])
 
 cf_with_groff=no
 
@@ -3732,7 +3760,7 @@ AC_SUBST(MAN2HTML_PATH)
 AC_SUBST(MAN2HTML_TEMP)
 ])dnl
 dnl ---------------------------------------------------------------------------
-dnl CF_WITH_PCRE version: 11 updated: 2015/04/12 15:39:00
+dnl CF_WITH_PCRE version: 12 updated: 2017/07/29 22:57:34
 dnl ------------
 dnl Add PCRE (Perl-compatible regular expressions) to the build if it is
 dnl available and the user requests it.  Assume the application will otherwise
@@ -3754,21 +3782,58 @@ if test "$with_pcre" != no ; then
 		AC_CHECK_LIB(pcre,pcre_compile,,
 			AC_MSG_ERROR(Cannot find PCRE library))])
 
-		AC_DEFINE(HAVE_LIB_PCRE,1,[Define to 1 if we can/should compile with the PCRE library])
+	AC_DEFINE(HAVE_LIB_PCRE,1,[Define to 1 if we can/should compile with the PCRE library])
 
-		case $LIBS in
-		(*pcreposix*)
-			;;
-		(*)
-			AC_CHECK_LIB(pcreposix,pcreposix_regcomp,
-				[AC_DEFINE(HAVE_PCREPOSIX_H,1,[Define to 1 if we should include pcreposix.h])
-				 CF_ADD_LIB(pcreposix)],
-				[AC_CHECK_LIB(pcreposix,regcomp,[
-					AC_DEFINE(HAVE_PCREPOSIX_H,1,[Define to 1 if we should include pcreposix.h])
-					CF_ADD_LIB(pcreposix)],
-					AC_MSG_ERROR(Cannot find PCRE POSIX library)]))
-			;;
-		esac
+	case $LIBS in
+	(*pcreposix*)
+		;;
+	(*)
+		AC_CHECK_LIB(pcreposix,pcreposix_regcomp,
+			[AC_DEFINE(HAVE_PCREPOSIX_H,1,[Define to 1 if we should include pcreposix.h])
+				CF_ADD_LIB(pcreposix)],
+			[AC_CHECK_LIB(pcreposix,regcomp,[
+				AC_DEFINE(HAVE_PCREPOSIX_H,1,[Define to 1 if we should include pcreposix.h])
+				CF_ADD_LIB(pcreposix)],
+				AC_MSG_ERROR(Cannot find PCRE POSIX library)]))
+		;;
+	esac
+fi
+])dnl
+dnl ---------------------------------------------------------------------------
+dnl CF_WITH_PCRE2 version: 1 updated: 2017/07/29 22:57:34
+dnl -------------
+dnl Add PCRE2 (Perl-compatible regular expressions v2) to the build if it is
+dnl available and the user requests it.  Assume the application will otherwise
+dnl use the POSIX interface.
+dnl
+dnl TODO allow $withval to specify package location
+AC_DEFUN([CF_WITH_PCRE2],
+[
+AC_REQUIRE([CF_PKG_CONFIG])
+
+AC_MSG_CHECKING(if you want to use PCRE2 for regular-expressions)
+AC_ARG_WITH(pcre2,
+	[  --with-pcre2            use PCRE2 for regular-expressions])
+test -z "$with_pcre2" && with_pcre2=no
+AC_MSG_RESULT($with_pcre2)
+
+if test "$with_pcre2" != no ; then
+	CF_TRY_PKG_CONFIG(libpcre2,,[
+		AC_CHECK_LIB(pcre2-8,pcre2_compile_8,,
+			AC_MSG_ERROR(Cannot find PCRE2 library))])
+
+	AC_DEFINE(HAVE_LIB_PCRE2,1,[Define to 1 if we can/should compile with the PCRE2 library])
+
+	case $LIBS in
+	(*pcre2-posix*)
+		;;
+	(*)
+		AC_CHECK_LIB(pcre2-posix,regcomp,[
+			AC_DEFINE(HAVE_PCRE2POSIX_H,1,[Define to 1 if we should include pcre2posix.h])
+			CF_ADD_LIB(pcre2-posix)],
+			AC_MSG_ERROR(Cannot find PCRE2 POSIX library))
+		;;
+	esac
 fi
 ])dnl
 dnl ---------------------------------------------------------------------------
