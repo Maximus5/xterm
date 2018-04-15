@@ -20,7 +20,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF   *
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.            *
  *****************************************************************************
-  $XTermId: xterm.log.html,v 1.581 2007/06/28 00:38:27 tom Exp $
+  $XTermId: xterm.log.html,v 1.596 2007/07/22 23:12:38 tom Exp $
   $XFree86: xc/programs/xterm/xterm.log.html,v 1.151 2006/06/20 00:42:38 dickey Exp $
   -->
 <HTML>
@@ -46,6 +46,7 @@ Most of these are summarized in the XFree86 CHANGELOG
 is the latest version of this file.
 
 <UL>
+<LI><A HREF="#xterm_228">Patch #228 - 2007/7/22</A>
 <LI><A HREF="#xterm_227">Patch #227 - 2007/6/27</A>
 <LI><A HREF="#xterm_226">Patch #226 - 2007/6/17</A>
 <LI><A HREF="#xterm_225">Patch #225 - 2007/3/24</A>
@@ -275,6 +276,65 @@ is the latest version of this file.
 <LI><A HREF="#xterm_02">Patch #2 - 1996/1/7</A>
 <LI><A HREF="#xterm_01">Patch #1 - 1996/1/6</A>
 </UL>
+
+<H1><A NAME="xterm_228">Patch #228 - 2007/7/22</A></H1>
+<ul>
+	<li>modify configure script to permit combining
+	    <code>--with-utempter</code>
+	    and <code>--enable-setuid</code>, e.g., for using xterm with 
+	    the utempter library on FreeBSD (report by Andriy Gapon).
+
+	<li>modify "Quit" menu entry to override the <code>-hold</code>
+	    command-line option.
+
+	<li>add a check in the startup error-reporting to avoid writing to
+	    pipe when it has not been opened.  In that case, report errors
+	    directly to the standard error.
+
+	<li>add OPT_READLINE definition to xtermcfg.hin, overlooked in
+	    <a href="#xterm_205">patch #205</a>
+	    (report by Kalle Olavi Niemitalo).
+
+	<li>modify <code>88colors2.pl</code> and <code>256colors2.pl</code>,
+	    adding <code>-r</code>
+	    option to reverse the palettes for the extended colors.
+
+	<li>check for partial overwrite or deletion of multi-column characters
+	    in several cases, e.g., insert-character, delete-character,
+	    etc.,
+	    and fill the remainder of the cells used by the multi-column
+	    characters affected with blanks.
+
+	<li>correct character-class codes in wide-character mode for characters
+	    215, 247 (see also <a href="#xterm_165">patch #165</a>).
+
+	<li>fix missing assignment for UTF-8 parsing in widget initialization
+	    (Debian #403360).
+
+	<li>correct index expression used to set line-wrapping flag, making
+	    selection from scrollback work consistently (Debian #430121,
+	    report by Vincent Lefevre).
+
+	<li>amend changes to handshake in
+	    <a href="#xterm_226">patch #226</a>
+	    to accommodate Solaris, which relies on the extra setting of
+	    the terminal size after I/O initialization.
+	    Do this by adding new resource <code>ptySttySize</code>,
+	    which is false for Linux and MacOS X, i.e., true for
+	    for Solaris and other SVR4 platforms, as well as FreeBSD
+	    (reports by David Wood, Renato Botelho).
+
+	<li>check for X events after cursor-left, and carriage return,
+	    consistent with indexing operations
+	    (comments by Vegard Nossum and Ingo Molnar on a mailing-list).
+
+	<li>initialize the <code>.keyboard</code> structure,
+	    needed for some platforms (such as Solaris) after
+	    <a href="#xterm_227">patch #227</a> fixes for keysyms
+	    (patch by David Wood).
+
+	<li>update config.guess, config.sub
+</ul>
 
 <H1><A NAME="xterm_227">Patch #227 - 2007/6/27</A></H1>
 <ul>
