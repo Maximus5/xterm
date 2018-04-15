@@ -1,4 +1,4 @@
-/* $XTermId: xterm.h,v 1.638 2011/02/09 10:13:20 tom Exp $ */
+/* $XTermId: xterm.h,v 1.644 2011/02/20 00:49:16 tom Exp $ */
 
 /************************************************************
 
@@ -417,6 +417,7 @@ extern char **environ;
 #define XtNforcePackedFont	"forcePackedFont"
 #define XtNformatOtherKeys	"formatOtherKeys"
 #define XtNfreeBoldBox		"freeBoldBox"
+#define XtNfullscreen		"fullscreen"
 #define XtNhighlightColor	"highlightColor"
 #define XtNhighlightColorMode	"highlightColorMode"
 #define XtNhighlightReverse	"highlightReverse"
@@ -544,7 +545,7 @@ extern char **environ;
 #define XtCC132			"C132"
 #define XtCCacheDoublesize	"CacheDoublesize"
 #define XtCCharClass		"CharClass"
-#define XtCCjkWidth 		"CjkWidth"
+#define XtCCjkWidth		"CjkWidth"
 #define XtCColorAttrMode	"ColorAttrMode"
 #define XtCColorMode		"ColorMode"
 #define XtCColumn		"Column"
@@ -586,6 +587,7 @@ extern char **environ;
 #define XtCForcePackedFont	"ForcePackedFont"
 #define XtCFormatOtherKeys	"FormatOtherKeys"
 #define XtCFreeBoldBox		"FreeBoldBox"
+#define XtCFullscreen		"Fullscreen"
 #define XtCHighlightColorMode	"HighlightColorMode"
 #define XtCHighlightReverse	"HighlightReverse"
 #define XtCHighlightSelection	"HighlightSelection"
@@ -609,7 +611,7 @@ extern char **environ;
 #define XtCMetaSendsEscape	"MetaSendsEscape"
 #define XtCMkSamplePass 	"MkSamplePass"
 #define XtCMkSampleSize 	"MkSampleSize"
-#define XtCMkWidth 		"MkWidth"
+#define XtCMkWidth		"MkWidth"
 #define XtCModifyCursorKeys	"ModifyCursorKeys"
 #define XtCModifyFunctionKeys	"ModifyFunctionKeys"
 #define XtCModifyKeypadKeys	"ModifyKeypadKeys"
@@ -812,6 +814,7 @@ extern void RestartBlinking(TScreen * /* screen */);
 extern void ShowCursor (void);
 extern void SwitchBufPtrs (TScreen * /* screen */, int /* toBuf */);
 extern void ToggleAlternate (XtermWidget /* xw */);
+extern void VTInitTranslations (void);
 extern void VTReset (XtermWidget /* xw */, int /* full */, int /* saved */);
 extern void VTRun (XtermWidget /* xw */);
 extern void dotext (XtermWidget /* xw */, int  /* charset */, IChar * /* buf */, Cardinal  /* len */);
@@ -1080,10 +1083,10 @@ extern void writePtyData (int  /* f */, IChar * /* d */, unsigned  /* len */);
 	 : False)
 #else
 #define morePtyData(screen, data) ((data)->last > (data)->next)
-#define nextPtyData(screen, data) (*((data)->next++) & \
-					(screen->output_eight_bits \
-					? 0xff \
-					: 0x7f))
+#define nextPtyData(screen, data) (IChar) (*((data)->next++) & \
+					   (screen->output_eight_bits \
+					    ? 0xff \
+					    : 0x7f))
 #define writePtyData(f,d,len) v_write(f,d,len)
 #endif
 
@@ -1096,6 +1099,7 @@ extern int ScreenResize (XtermWidget /* xw */, int  /* width */, int  /* height 
 extern size_t ScrnPointers (TScreen * /* screen */, size_t  /* len */);
 extern void ClearBufRows (XtermWidget /* xw */, int  /* first */, int  /* last */);
 extern void ClearCells (XtermWidget /* xw */, int /* flags */, unsigned /* len */, int /* row */, int /* col */);
+extern void FullScreen(XtermWidget /* xw */, Bool /* enabled */);
 extern void ScrnAllocBuf (XtermWidget /* xw */);
 extern void ScrnClearCells (XtermWidget /* xw */, int /* row */, int /* col */, unsigned /* len */);
 extern void ScrnDeleteChar (XtermWidget /* xw */, unsigned  /* n */);
@@ -1199,6 +1203,7 @@ extern int AddToRefresh (XtermWidget /* xw */);
 extern int ClearInLine (XtermWidget /* xw */, int /* row */, int /* col */, unsigned /* len */);
 extern int HandleExposure (XtermWidget /* xw */, XEvent * /* event */);
 extern int drawXtermText (XtermWidget /* xw */, unsigned /* flags */, GC /* gc */, int /* x */, int /* y */, int /* chrset */, IChar * /* text */, Cardinal /* len */, int /* on_wide */);
+extern int extendedBoolean(const char * /* value */, FlagList * /* table */, Cardinal /* limit */);
 extern void ChangeColors (XtermWidget  /* xw */, ScrnColors * /* pNew */);
 extern void ClearRight (XtermWidget /* xw */, int /* n */);
 extern void ClearScreen (XtermWidget /* xw */);
@@ -1266,10 +1271,10 @@ extern Pixel xtermGetColorRes(XtermWidget /* xw */, ColorRes * /* res */);
 #define MapToColorMode(fg, screen, flags) \
 	(((screen)->colorBLMode && ((flags) & BLINK)) \
 	 ? COLOR_BL \
-	 : (((screen)->colorULMode && ((flags) & UNDERLINE)) \
-	    ? COLOR_UL \
-	    : (((screen)->colorBDMode && ((flags) & BOLD)) \
-	       ? COLOR_BD \
+	 : (((screen)->colorBDMode && ((flags) & BOLD)) \
+	    ? COLOR_BD \
+	    : (((screen)->colorULMode && ((flags) & UNDERLINE)) \
+	       ? COLOR_UL \
 	       : fg)))
 
 #define checkVeryBoldAttr(flags, fg, code, attr) \

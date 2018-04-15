@@ -1,4 +1,4 @@
-/* $XTermId: main.c,v 1.620 2011/02/09 10:13:32 tom Exp $ */
+/* $XTermId: main.c,v 1.625 2011/02/18 01:24:50 tom Exp $ */
 
 /*
  *				 W A R N I N G
@@ -832,7 +832,6 @@ static sigjmp_buf env;
 
 static XtResource application_resources[] =
 {
-    Sres("name", "Name", xterm_name, DFT_TERMTYPE),
     Sres("iconGeometry", "IconGeometry", icon_geometry, NULL),
     Sres(XtNtitle, XtCTitle, title, NULL),
     Sres(XtNiconName, XtCIconName, icon_name, NULL),
@@ -845,6 +844,7 @@ static XtResource application_resources[] =
     Ires("minBufSize", "MinBufSize", minBufSize, 4096),
     Ires("maxBufSize", "MaxBufSize", maxBufSize, 32768),
     Sres("menuLocale", "MenuLocale", menuLocale, DEF_MENU_LOCALE),
+    Sres("omitTranslation", "OmitTranslation", omitTranslation, NULL),
     Sres("keyboardType", "KeyboardType", keyboardType, "unknown"),
 #if OPT_SUNPC_KBD
     Bres("sunKeyboard", "SunKeyboard", sunKeyboard, False),
@@ -885,6 +885,7 @@ static XtResource application_resources[] =
 #endif
 #if OPT_MAXIMIZE
     Bres(XtNmaximized, XtCMaximized, maximized, False),
+    Sres(XtNfullscreen, XtCFullscreen, fullscreen_s, "off"),
 #endif
 };
 
@@ -1081,6 +1082,8 @@ static XrmOptionDescRec optionDescList[] = {
 #if OPT_MAXIMIZE
 {"-maximized",	"*maximized",	XrmoptionNoArg,		(XPointer) "on"},
 {"+maximized",	"*maximized",	XrmoptionNoArg,		(XPointer) "off"},
+{"-fullscreen",	"*fullscreen",	XrmoptionNoArg,		(XPointer) "on"},
+{"+fullscreen",	"*fullscreen",	XrmoptionNoArg,		(XPointer) "off"},
 #endif
 /* options that we process ourselves */
 {"-help",	NULL,		XrmoptionSkipNArgs,	(XPointer) NULL},
@@ -1256,6 +1259,7 @@ static OptionHelp xtermOptions[] = {
 #endif
 #if OPT_MAXIMIZE
 {"-/+maximized",           "turn on/off maxmize on startup" },
+{"-/+fullscreen",          "turn on/off fullscreen on startup" },
 #endif
 { NULL, NULL }};
 /* *INDENT-ON* */
@@ -1747,6 +1751,16 @@ setEffectiveUser(uid_t user)
 int
 main(int argc, char *argv[]ENVP_ARG)
 {
+#if OPT_MAXIMIZE
+#define DATA(name) { #name, es##name }
+    static FlagList tblFullscreen[] =
+    {
+	DATA(Always),
+	DATA(Never)
+    };
+#undef DATA
+#endif
+
     Widget form_top, menu_top;
     Dimension menu_high;
     TScreen *screen;
@@ -1987,6 +2001,12 @@ main(int argc, char *argv[]ENVP_ARG)
 				  application_resources,
 				  XtNumber(application_resources), NULL, 0);
 	TRACE_XRES();
+	VTInitTranslations();
+#if OPT_MAXIMIZE
+	resource.fullscreen = extendedBoolean(resource.fullscreen_s,
+					      tblFullscreen,
+					      XtNumber(tblFullscreen));
+#endif
 #if OPT_PTY_HANDSHAKE
 	resource.wait_for_map0 = resource.wait_for_map;
 #endif
@@ -2029,9 +2049,6 @@ main(int argc, char *argv[]ENVP_ARG)
     }
 #endif /* OPT_ZICONBEEP */
     hold_screen = resource.hold_screen ? 1 : 0;
-    xterm_name = resource.xterm_name;
-    if (strcmp(xterm_name, "-") == 0)
-	xterm_name = DFT_TERMTYPE;
     if (resource.icon_geometry != NULL) {
 	int scr, junk;
 	int ix, iy;
@@ -3315,6 +3332,7 @@ spawnXTerm(XtermWidget xw)
 	}
     }
     if (ok_termcap) {
+	resource.term_name = TermName;
 	resize_termcap(xw);
     }
 
@@ -3890,8 +3908,8 @@ spawnXTerm(XtermWidget xw)
 
 	    xtermCopyEnv(environ);
 
-	    xtermSetenv("TERM", TermName);
-	    if (!TermName)
+	    xtermSetenv("TERM", resource.term_name);
+	    if (!resource.term_name)
 		*get_tcap_buffer(xw) = 0;
 
 	    sprintf(buf, "%lu",

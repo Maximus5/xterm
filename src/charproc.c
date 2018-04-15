@@ -1,10 +1,10 @@
-/* $XTermId: charproc.c,v 1.1100 2011/02/09 10:15:36 tom Exp $ */
+/* $XTermId: charproc.c,v 1.1112 2011/02/20 00:50:46 tom Exp $ */
 
 /*
  * Copyright 1999-2010,2011 by Thomas E. Dickey
- * 
+ *
  *                         All Rights Reserved
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -12,10 +12,10 @@
  * distribute, sublicense, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -23,35 +23,35 @@
  * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- * 
+ *
  * Except as contained in this notice, the name(s) of the above copyright
  * holders shall not be used in advertising or otherwise to promote the
  * sale, use or other dealings in this Software without prior written
  * authorization.
- * 
- * 
+ *
+ *
  * Copyright 1988  The Open Group
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software and its
  * documentation for any purpose is hereby granted without fee, provided that
  * the above copyright notice appear in all copies and that both that
  * copyright notice and this permission notice appear in supporting
  * documentation.
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
  * OPEN GROUP BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN
  * AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- * 
+ *
  * Except as contained in this notice, the name of The Open Group shall not be
  * used in advertising or otherwise to promote the sale, use or other dealings
  * in this Software without prior written authorization from The Open Group.
- * 
+ *
  */
 /*
  * Copyright 1987 by Digital Equipment Corporation, Maynard, Massachusetts.
@@ -131,11 +131,6 @@
 #include <xcharmouse.h>
 #include <charclass.h>
 #include <xstrings.h>
-
-typedef struct {
-    const char *name;
-    int code;
-} FlagList;
 
 typedef void (*BitFunc) (unsigned * /* p */ ,
 			 unsigned /* mask */ );
@@ -218,65 +213,7 @@ static void HandleStructNotify PROTO_XT_EV_HANDLER_ARGS;
 
 static String _Font_Selected_ = "yes";	/* string is arbitrary */
 
-static char defaultTranslations[] =
-"\
-          Shift <KeyPress> Prior:scroll-back(1,halfpage) \n\
-           Shift <KeyPress> Next:scroll-forw(1,halfpage) \n\
-         Shift <KeyPress> Select:select-cursor-start() select-cursor-end(SELECT, CUT_BUFFER0) \n\
-         Shift <KeyPress> Insert:insert-selection(SELECT, CUT_BUFFER0) \n\
-"
-#if OPT_MAXIMIZE
-"\
-                 Alt <Key>Return:fullscreen() \n\
-"
-#endif
-#if OPT_SCROLL_LOCK
-"\
-        <KeyRelease> Scroll_Lock:scroll-lock() \n\
-"
-#endif
-#if OPT_SHIFT_FONTS
-"\
-    Shift~Ctrl <KeyPress> KP_Add:larger-vt-font() \n\
-    Shift Ctrl <KeyPress> KP_Add:smaller-vt-font() \n\
-    Shift <KeyPress> KP_Subtract:smaller-vt-font() \n\
-"
-#endif
-"\
-                ~Meta <KeyPress>:insert-seven-bit() \n\
-                 Meta <KeyPress>:insert-eight-bit() \n\
-                !Ctrl <Btn1Down>:popup-menu(mainMenu) \n\
-           !Lock Ctrl <Btn1Down>:popup-menu(mainMenu) \n\
- !Lock Ctrl @Num_Lock <Btn1Down>:popup-menu(mainMenu) \n\
-     ! @Num_Lock Ctrl <Btn1Down>:popup-menu(mainMenu) \n\
-                ~Meta <Btn1Down>:select-start() \n\
-              ~Meta <Btn1Motion>:select-extend() \n\
-                !Ctrl <Btn2Down>:popup-menu(vtMenu) \n\
-           !Lock Ctrl <Btn2Down>:popup-menu(vtMenu) \n\
- !Lock Ctrl @Num_Lock <Btn2Down>:popup-menu(vtMenu) \n\
-     ! @Num_Lock Ctrl <Btn2Down>:popup-menu(vtMenu) \n\
-          ~Ctrl ~Meta <Btn2Down>:ignore() \n\
-                 Meta <Btn2Down>:clear-saved-lines() \n\
-            ~Ctrl ~Meta <Btn2Up>:insert-selection(SELECT, CUT_BUFFER0) \n\
-                !Ctrl <Btn3Down>:popup-menu(fontMenu) \n\
-           !Lock Ctrl <Btn3Down>:popup-menu(fontMenu) \n\
- !Lock Ctrl @Num_Lock <Btn3Down>:popup-menu(fontMenu) \n\
-     ! @Num_Lock Ctrl <Btn3Down>:popup-menu(fontMenu) \n\
-          ~Ctrl ~Meta <Btn3Down>:start-extend() \n\
-              ~Meta <Btn3Motion>:select-extend() \n\
-                 Ctrl <Btn4Down>:scroll-back(1,halfpage,m) \n\
-            Lock Ctrl <Btn4Down>:scroll-back(1,halfpage,m) \n\
-  Lock @Num_Lock Ctrl <Btn4Down>:scroll-back(1,halfpage,m) \n\
-       @Num_Lock Ctrl <Btn4Down>:scroll-back(1,halfpage,m) \n\
-                      <Btn4Down>:scroll-back(5,line,m)     \n\
-                 Ctrl <Btn5Down>:scroll-forw(1,halfpage,m) \n\
-            Lock Ctrl <Btn5Down>:scroll-forw(1,halfpage,m) \n\
-  Lock @Num_Lock Ctrl <Btn5Down>:scroll-forw(1,halfpage,m) \n\
-       @Num_Lock Ctrl <Btn5Down>:scroll-forw(1,halfpage,m) \n\
-                      <Btn5Down>:scroll-forw(5,line,m)     \n\
-                         <BtnUp>:select-end(SELECT, CUT_BUFFER0) \n\
-                       <BtnDown>:ignore() \
-";				/* PROCURA added "Meta <Btn2Down>:clear-saved-lines()" */
+static const char *defaultTranslations;
 /* *INDENT-OFF* */
 static XtActionsRec actionsList[] = {
     { "allow-send-events",	HandleAllowSends },
@@ -819,7 +756,7 @@ WidgetClassRec xtermClassRec =
 	NULL,			/* accept_focus                 */
 	XtVersion,		/* version                      */
 	NULL,			/* callback_offsets             */
-	defaultTranslations,	/* tm_table                     */
+	0,			/* tm_table                     */
 	XtInheritQueryGeometry,	/* query_geometry               */
 	XtInheritDisplayAccelerator,	/* display_accelerator  */
 	NULL			/* extension                    */
@@ -3409,7 +3346,7 @@ v_write(int f, const Char * data, unsigned len)
 		} else {
 		    /* no memory: ignore entire write request */
 		    fprintf(stderr, "%s: cannot allocate buffer space\n",
-			    xterm_name);
+			    ProgramName);
 		    v_buffer = v_bufstr;	/* restore clobbered pointer */
 		}
 	    }
@@ -3898,7 +3835,7 @@ dotext(XtermWidget xw,
     }
 #else /* ! OPT_WIDE_CHARS */
 
-    for (offset = 0; offset < len; offset += this_col) {
+    for (offset = 0; offset < len; offset += (Cardinal) this_col) {
 #if OPT_DEC_CHRSET
 	LineData *ld = getLineData(screen, screen->cur_row);
 #endif
@@ -3914,8 +3851,8 @@ dotext(XtermWidget xw,
 	    }
 	    this_col = 1;
 	}
-	if (offset + this_col > len) {
-	    this_col = len - offset;
+	if (offset + (Cardinal) this_col > len) {
+	    this_col = (int) (len - offset);
 	}
 	next_col = screen->cur_col + this_col;
 
@@ -3926,7 +3863,7 @@ dotext(XtermWidget xw,
 	 * If screen->cur_col is less than next_col, we must have
 	 * hit the right margin - so set the do_wrap flag.
 	 */
-	screen->do_wrap = (screen->cur_col < next_col);
+	screen->do_wrap = (Boolean) (screen->cur_col < next_col);
     }
 
 #endif /* OPT_WIDE_CHARS */
@@ -4988,6 +4925,11 @@ window_ops(XtermWidget xw)
 	    RequestMaximize(xw, zero_if_default(1));
 	}
 	break;
+    case ewFullscreenWin:	/* Fullscreen or restore */
+	if (AllowWindowOps(xw, ewFullscreenWin)) {
+	    FullScreen(xw, zero_if_default(1));
+	}
+	break;
 #endif
 
     case ewGetWinState:	/* Report the window's state */
@@ -5452,6 +5394,10 @@ VTRun(XtermWidget xw)
     }
 #endif
     screen->is_running = True;
+#if OPT_MAXIMIZE
+    if (resource.fullscreen == esTrue || resource.fullscreen == esAlways)
+	FullScreen(term, True);
+#endif
     if (!setjmp(VTend))
 	VTparse(xw);
     StopBlinking(screen);
@@ -5954,49 +5900,6 @@ set_flags_from_list(char *target,
     }
 }
 
-/*
- * Extend a (normally) boolean resource value by checking for additional values
- * which will be mapped into true/false.
- */
-#if OPT_RENDERFONT
-static int
-extendedBoolean(const char *value, FlagList * table, Cardinal limit)
-{
-    int result = -1;
-    long check;
-    char *next;
-    Cardinal n;
-
-    if ((x_strcasecmp(value, "true") == 0)
-	|| (x_strcasecmp(value, "yes") == 0)
-	|| (x_strcasecmp(value, "on") == 0)) {
-	result = True;
-    } else if ((x_strcasecmp(value, "false") == 0)
-	       || (x_strcasecmp(value, "no") == 0)
-	       || (x_strcasecmp(value, "off") == 0)) {
-	result = False;
-    } else if ((check = strtol(value, &next, 0)) >= 0 && *next == '\0') {
-	if (check >= (long) limit)
-	    check = True;
-	result = (int) check;
-    } else {
-	for (n = 0; n < limit; ++n) {
-	    if (x_strcasecmp(value, table[n].name) == 0) {
-		result = table[n].code;
-		break;
-	    }
-	}
-    }
-
-    if (result < 0) {
-	fprintf(stderr, "Unrecognized keyword: %s\n", value);
-	result = False;
-    }
-
-    return result;
-}
-#endif /* OPT_RENDERFONT */
-
 /* ARGSUSED */
 static void
 VTInitialize(Widget wrequest,
@@ -6048,6 +5951,7 @@ VTInitialize(Widget wrequest,
 	,DATA(SetWinSizeChars)
 #if OPT_MAXIMIZE
 	,DATA(MaximizeWin)
+	,DATA(FullscreenWin)
 #endif
 	,DATA(GetWinState)
 	,DATA(GetWinPosition)
@@ -7029,7 +6933,7 @@ VTRealize(Widget w,
 	    char *use_font = x_strdup(DEFFONT);
 	    fprintf(stderr,
 		    "%s:  unable to open font \"%s\", trying \"%s\"....\n",
-		    xterm_name, myfont->f_n, use_font);
+		    ProgramName, myfont->f_n, use_font);
 	    (void) xtermLoadFont(xw,
 				 xtermFontName(use_font),
 				 False,
@@ -7041,7 +6945,7 @@ VTRealize(Widget w,
     /* really screwed if we couldn't open default font */
     if (!screen->fnts[fNorm].fs) {
 	fprintf(stderr, "%s:  unable to locate a suitable font\n",
-		xterm_name);
+		ProgramName);
 	Exit(1);
     }
 #if OPT_WIDE_CHARS
@@ -7347,6 +7251,7 @@ VTRealize(Widget w,
 	screen->fullVwin.sb_info.width = 0;
 	ScrollBarOn(xw, False);
     }
+
     return;
 }
 
@@ -7626,7 +7531,7 @@ VTInitI18N(XtermWidget xw)
 
 static void
 set_cursor_outline_gc(XtermWidget xw,
-		      Boolean filled,
+		      Bool filled,
 		      Pixel fg,
 		      Pixel bg,
 		      Pixel cc)
@@ -8827,6 +8732,182 @@ set_cursor_gcs(XtermWidget xw)
 	TRACE(("...set_cursor_gcs - done\n"));
     }
     return changed;
+}
+
+/*
+ * Build up the default translations string, allowing the user to suppress
+ * some of the features.
+ */
+void
+VTInitTranslations(void)
+{
+    /* *INDENT-OFF* */
+    static struct {
+	Boolean wanted;
+	const char *name;
+	const char *value;
+    } table[] = {
+	{
+	    False,
+	    "default",
+"\
+          Shift <KeyPress> Prior:scroll-back(1,halfpage) \n\
+           Shift <KeyPress> Next:scroll-forw(1,halfpage) \n\
+         Shift <KeyPress> Select:select-cursor-start() select-cursor-end(SELECT, CUT_BUFFER0) \n\
+         Shift <KeyPress> Insert:insert-selection(SELECT, CUT_BUFFER0) \n\
+"
+	},
+#if OPT_MAXIMIZE
+	{
+	    False,
+	    "fullscreen",
+"\
+                 Alt <Key>Return:fullscreen() \n\
+"
+	},
+#endif
+#if OPT_SCROLL_LOCK
+	{
+	    False,
+	    "scroll-lock",
+"\
+        <KeyRelease> Scroll_Lock:scroll-lock() \n\
+"
+	},
+#endif
+#if OPT_SHIFT_FONTS
+	{
+	    False,
+	    "shift-fonts",
+"\
+    Shift~Ctrl <KeyPress> KP_Add:larger-vt-font() \n\
+    Shift Ctrl <KeyPress> KP_Add:smaller-vt-font() \n\
+    Shift <KeyPress> KP_Subtract:smaller-vt-font() \n\
+"
+	},
+#endif
+	/* PROCURA added "Meta <Btn2Down>:clear-saved-lines()" */
+	{
+	    False,
+	    "default",
+"\
+                ~Meta <KeyPress>:insert-seven-bit() \n\
+                 Meta <KeyPress>:insert-eight-bit() \n\
+                !Ctrl <Btn1Down>:popup-menu(mainMenu) \n\
+           !Lock Ctrl <Btn1Down>:popup-menu(mainMenu) \n\
+ !Lock Ctrl @Num_Lock <Btn1Down>:popup-menu(mainMenu) \n\
+     ! @Num_Lock Ctrl <Btn1Down>:popup-menu(mainMenu) \n\
+                ~Meta <Btn1Down>:select-start() \n\
+              ~Meta <Btn1Motion>:select-extend() \n\
+                !Ctrl <Btn2Down>:popup-menu(vtMenu) \n\
+           !Lock Ctrl <Btn2Down>:popup-menu(vtMenu) \n\
+ !Lock Ctrl @Num_Lock <Btn2Down>:popup-menu(vtMenu) \n\
+     ! @Num_Lock Ctrl <Btn2Down>:popup-menu(vtMenu) \n\
+          ~Ctrl ~Meta <Btn2Down>:ignore() \n\
+                 Meta <Btn2Down>:clear-saved-lines() \n\
+            ~Ctrl ~Meta <Btn2Up>:insert-selection(SELECT, CUT_BUFFER0) \n\
+                !Ctrl <Btn3Down>:popup-menu(fontMenu) \n\
+           !Lock Ctrl <Btn3Down>:popup-menu(fontMenu) \n\
+ !Lock Ctrl @Num_Lock <Btn3Down>:popup-menu(fontMenu) \n\
+     ! @Num_Lock Ctrl <Btn3Down>:popup-menu(fontMenu) \n\
+          ~Ctrl ~Meta <Btn3Down>:start-extend() \n\
+              ~Meta <Btn3Motion>:select-extend() \n\
+"
+	},
+	{
+	    False,
+	    "wheel-mouse",
+"\
+                 Ctrl <Btn4Down>:scroll-back(1,halfpage,m) \n\
+            Lock Ctrl <Btn4Down>:scroll-back(1,halfpage,m) \n\
+  Lock @Num_Lock Ctrl <Btn4Down>:scroll-back(1,halfpage,m) \n\
+       @Num_Lock Ctrl <Btn4Down>:scroll-back(1,halfpage,m) \n\
+                      <Btn4Down>:scroll-back(5,line,m)     \n\
+                 Ctrl <Btn5Down>:scroll-forw(1,halfpage,m) \n\
+            Lock Ctrl <Btn5Down>:scroll-forw(1,halfpage,m) \n\
+  Lock @Num_Lock Ctrl <Btn5Down>:scroll-forw(1,halfpage,m) \n\
+       @Num_Lock Ctrl <Btn5Down>:scroll-forw(1,halfpage,m) \n\
+                      <Btn5Down>:scroll-forw(5,line,m)     \n\
+"
+	},
+	{
+	    False,
+	    "default",
+"\
+                         <BtnUp>:select-end(SELECT, CUT_BUFFER0) \n\
+                       <BtnDown>:ignore() \
+"
+	}
+    };
+    /* *INDENT-ON* */
+
+    size_t needed = 0;
+    char *result = 0;
+
+    int pass;
+    Cardinal item;
+
+    TRACE(("VTInitTranslations\n"));
+    for (item = 0; item < XtNumber(table); ++item) {
+	table[item].wanted = True;
+    }
+#if OPT_MAXIMIZE
+    /*
+     * As a special case, allow for disabling the alt-enter translation if
+     * the resource settings prevent fullscreen from being used.  We would
+     * do the same for scroll-lock and shift-fonts if they were application
+     * resources too, rather than in the widget.
+     */
+    if (resource.fullscreen == esNever) {
+	for (item = 0; item < XtNumber(table); ++item) {
+	    if (!strcmp(table[item].name, "fullscreen"))
+		table[item].wanted = False;
+	}
+    }
+#endif
+    if (!IsEmpty(resource.omitTranslation)) {
+	char *value;
+	const char *source = resource.omitTranslation;
+
+	while (*source != '\0' && (value = ParseList(&source)) != 0) {
+	    size_t len = strlen(value);
+
+	    TRACE(("parsed:%s\n", value));
+	    for (item = 0; item < XtNumber(table); ++item) {
+		if (strlen(table[item].name) >= len
+		    && x_strncasecmp(table[item].name,
+				     value,
+				     (unsigned) len) == 0) {
+		    table[item].wanted = False;
+		    TRACE(("omit(%s):\n%s\n", table[item].name, table[item].value));
+		    break;
+		}
+	    }
+	    free(value);
+	}
+    }
+
+    for (pass = 0; pass < 2; ++pass) {
+	needed = 0;
+	for (item = 0; item < XtNumber(table); ++item) {
+	    if (table[item].wanted) {
+		if (pass) {
+		    strcat(result, table[item].value);
+		} else {
+		    needed += strlen(table[item].value) + 1;
+		}
+	    }
+	}
+	if (!pass) {
+	    result = XtMalloc((Cardinal) needed);
+	    *result = '\0';
+	}
+    }
+
+    TRACE(("result:\n%s\n", result));
+
+    defaultTranslations = result;
+    xtermClassRec.core_class.tm_table = result;
 }
 
 #ifdef NO_LEAKS
