@@ -1,3 +1,10 @@
+xterm-dev (287) unstable; urgency=low
+
+  * Miscellaneous fixes.
+  * Redhat #874327, #875305.
+
+ -- Thomas E. Dickey <dickey@invisible-island.net>  Mon, 19 Nov 2012 04:53:39 -0500
+
 xterm-dev (286) unstable; urgency=low
 
   * Redhat #869959

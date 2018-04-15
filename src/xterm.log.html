@@ -31,7 +31,7 @@
  * sale, use or other dealings in this Software without prior written        *
  * authorization.                                                            *
  *****************************************************************************
-  $XTermId: xterm.log.html,v 1.1265 2012/10/29 23:24:00 tom Exp $
+  $XTermId: xterm.log.html,v 1.1282 2012/11/26 00:52:40 tom Exp $
   -->
 
 <html>
@@ -70,6 +70,8 @@
   the latest version of this file.</p>
 
   <ul>
+    <li><a href="#xterm_287">Patch #287 - 2012/11/25</a></li>
+
     <li><a href="#xterm_286">Patch #286 - 2012/10/29</a></li>
 
     <li><a href="#xterm_285">Patch #285 - 2012/10/23</a></li>
@@ -855,6 +857,65 @@
     <li><a href="#xterm_01">Patch #1 - 1996/1/6</a></li>
   </ul>
 
+  <h1><a name="xterm_287" id="xterm_287">Patch #287 -
+  2012/11/25</a></h1>
+
+  <ul>
+    <li>fix a case where in_put() loop could continue when it has
+    found an X event rather than the pty, causing the pty-read to
+    be delayed (patch by Balazs Kezes).</li>
+
+    <li>add option to <code>pointerMode</code> resource and
+    corresponding control sequences to allow text-cursor to remain
+    hidden if the pointer leaves/enters the window via accelerator
+    keys. Ordinary motion within the window restores the pointer
+    (prompted by patch by Balazs Kezes).</li>
+
+    <li>remove special case of modifiers for the
+    <code>Mode_switch</code> and <code>XK_ISO_Level3_Shift</code>
+    from <a href="#xterm_223">patch #223</a>. Verified that the
+    conflict which this was intended to resolve does not happen for
+    normal compose- or modeswitch-handling (prompted by patch by
+    Balazs Kezes, Debian #638694).</li>
+
+    <li>modify the handling of focus-change events to ignore those
+    whose detail is <code>NotifyPointer</code>, since those are
+    sent in addition to focus-change events directed to the old/new
+    windows having focus (prompted by patch by Balazs Kezes to
+    prevent the urgency-hint from being reset in this
+    scenario).</li>
+
+    <li>modify description of <code>iconName</code> in manpage to
+    make it clearer that this resource does not specify the
+    filename of an icon (discussion with Ian Collier).</li>
+
+    <li>modify <code>iconHint</code> resource to allow suppressing
+    the built-in icon by setting this to "none" (discussion with
+    Ian Collier).</li>
+
+    <li>make <code>-iconic</code> option work with the toolbar
+    configuration.</li>
+
+    <li>correct initialization of window manager hints used to set
+    the icon-pixmap. That detail from <a href="#xterm_282">patch
+    #282</a> overwrote state used to control the
+    <code>-iconic</code> command-line option (report by Ian
+    Collier).</li>
+
+    <li>fix paste64 feature for the case where the selection comes
+    from the current terminal. The selection callback can happen
+    after the reply is partly built, making it necessary to flush
+    the reply-buffer to keep things in the proper order (report by
+    Ailin Nemui).</li>
+
+    <li>reject command-line options which are longer than the
+    options in xterm's table, to avoid mismatches (Redhat
+    #875305).</li>
+
+    <li>correct attribution for <a href="#xterm_282">patch #282</a>
+    changes.</li>
+  </ul>
+
   <h1><a name="xterm_286" id="xterm_286">Patch #286 -
   2012/10/29</a></h1>
 
@@ -1003,11 +1064,11 @@
 
     <li>add feature to optionally scroll current page before
     clearing, controlled by resource setting
-    <code>cdXtraScroll</code> (prompted by patch by Richard
-    Wagenblast):</li>
+    <code>cdXtraScroll</code> (prompted by patch by Balazs
+    Kezes):</li>
 
     <li>integrated patches from Arch Linux forum posting (patches
-    by Richard Wagenblast):
+    by Balazs Kezes):
 
       <ul>
         <li>modify reallocation limit of line-data when resizing

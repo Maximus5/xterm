@@ -1,4 +1,4 @@
-/* $XTermId: ptyx.h,v 1.757 2012/10/29 00:48:16 tom Exp $ */
+/* $XTermId: ptyx.h,v 1.759 2012/11/25 16:05:51 tom Exp $ */
 
 /*
  * Copyright 1999-2011,2012 by Thomas E. Dickey
@@ -2227,9 +2227,10 @@ typedef enum {
 } xtermKeyboardType;
 
 typedef enum {			/* legal values for screen.pointer_mode */
-    pNever = 0,
-    pNoMouse = 1,
-    pAlways = 2
+    pNever = 0
+    , pNoMouse = 1
+    , pAlways = 2
+    , pFocused = 3
 } pointerModeTypes;
 
 typedef enum {			/* legal values for screen.utf8_mode */
@@ -2421,7 +2422,6 @@ typedef struct _Work {
     unsigned num_lock;		/* modifier for Num_Lock */
     unsigned alt_mods;		/* modifier for Alt_L or Alt_R */
     unsigned meta_mods;		/* modifier for Meta_L or Meta_R */
-    unsigned other_mods;	/* conflicting modifiers, e.g., Mode_Switch */
 #endif
 #if OPT_RENDERFONT
     Boolean render_font;

@@ -1,4 +1,4 @@
-/* $XTermId: misc.c,v 1.627 2012/10/28 23:09:35 tom Exp $ */
+/* $XTermId: misc.c,v 1.631 2012/11/25 16:05:51 tom Exp $ */
 
 /*
  * Copyright 1999-2011,2012 by Thomas E. Dickey
@@ -204,7 +204,7 @@ unselectwindow(XtermWidget xw, int flag)
 
     TRACE(("unselectwindow(%d) flag=%d\n", screen->select, flag));
 
-    if (screen->hide_pointer) {
+    if (screen->hide_pointer && screen->pointer_mode < pFocused) {
 	screen->hide_pointer = False;
 	xtermDisplayCursor(xw);
     }
@@ -344,6 +344,7 @@ xtermShowPointer(XtermWidget xw, Bool enable)
 		enable = True;
 	    break;
 	case pAlways:
+	case pFocused:
 	    break;
 	}
     }
@@ -618,20 +619,28 @@ xevents(void)
 	 * mouse pointer back on.
 	 */
 	if (screen->hide_pointer) {
-	    switch (event.xany.type) {
-	    case KeyPress:
-	    case KeyRelease:
-	    case ButtonPress:
-	    case ButtonRelease:
-		/* also these... */
-	    case Expose:
-	    case NoExpose:
-	    case PropertyNotify:
-	    case ClientMessage:
-		break;
-	    default:
-		xtermShowPointer(xw, True);
-		break;
+	    if (screen->pointer_mode >= pFocused) {
+		switch (event.xany.type) {
+		case MotionNotify:
+		    xtermShowPointer(xw, True);
+		    break;
+		}
+	    } else {
+		switch (event.xany.type) {
+		case KeyPress:
+		case KeyRelease:
+		case ButtonPress:
+		case ButtonRelease:
+		    /* also these... */
+		case Expose:
+		case NoExpose:
+		case PropertyNotify:
+		case ClientMessage:
+		    break;
+		default:
+		    xtermShowPointer(xw, True);
+		    break;
+		}
 	    }
 	}
 
@@ -915,14 +924,21 @@ HandleFocusChange(Widget w GCC_UNUSED,
     XtermWidget xw = term;
     TScreen *screen = TScreenOf(xw);
 
-    TRACE(("HandleFocusChange type=%s, mode=%d, detail=%d\n",
+    TRACE(("HandleFocusChange type=%s, mode=%s, detail=%s\n",
 	   visibleEventType(event->type),
-	   event->mode,
-	   event->detail));
+	   visibleNotifyMode(event->mode),
+	   visibleNotifyDetail(event->detail)));
     TRACE_FOCUS(xw, event);
 
     if (screen->quiet_grab
 	&& (event->mode == NotifyGrab || event->mode == NotifyUngrab)) {
+	/* EMPTY */ ;
+    } else if ((event->type == FocusIn || event->type == FocusOut)
+	       && event->detail == NotifyPointer) {
+	/*
+	 * NotifyPointer is sent to the window where the pointer is, and is
+	 * in addition to events sent to the old/new focus-windows.
+	 */
 	/* EMPTY */ ;
     } else if (event->type == FocusIn) {
 	setXUrgency(xw, False);
@@ -4369,6 +4385,26 @@ BuiltInXPM(const XPM_DATA * table, Cardinal length)
     return result;
 }
 #endif /* OPT_BUILTIN_XPMS */
+
+typedef enum {
+    eHintDefault = 0		/* use the largest builtin-icon */
+    ,eHintNone
+    ,eHintSearch
+} ICON_HINT;
+
+static ICON_HINT
+which_icon_hint(void)
+{
+    ICON_HINT result = eHintDefault;
+    if (!IsEmpty(resource.icon_hint)) {
+	if (!x_strcasecmp(resource.icon_hint, "none")) {
+	    result = eHintNone;
+	} else {
+	    result = eHintSearch;
+	}
+    }
+    return result;
+}
 #endif /* HAVE_LIBXPM */
 
 int
@@ -4403,6 +4439,7 @@ xtermLoadIcon(XtermWidget xw)
     Pixmap myIcon = 0;
     Pixmap myMask = 0;
     char *workname = 0;
+    ICON_HINT hint = which_icon_hint();
 #if OPT_BUILTIN_XPMS
 #include <icons/mini.xterm.xpms>
 #include <icons/filled-xterm.xpms>
@@ -4414,7 +4451,7 @@ xtermLoadIcon(XtermWidget xw)
 
     TRACE(("xtermLoadIcon %p:%s\n", (void *) xw, NonNull(resource.icon_hint)));
 
-    if (!IsEmpty(resource.icon_hint)) {
+    if (hint == eHintSearch) {
 	int state = 0;
 	while (x_find_icon(&workname, &state, ".xpm") != 0) {
 	    Pixmap resIcon = 0;
@@ -4442,7 +4479,7 @@ xtermLoadIcon(XtermWidget xw)
      * If no external file was found, look for the name in the built-in table.
      * If that fails, just use the biggest mini-icon.
      */
-    if (myIcon == 0) {
+    if (myIcon == 0 && hint != eHintNone) {
 	char **data;
 #if OPT_BUILTIN_XPMS
 	const XPM_DATA *myData = 0;
@@ -4474,7 +4511,7 @@ xtermLoadIcon(XtermWidget xw)
 	    hints = XAllocWMHints();
 
 	if (hints) {
-	    hints->flags = IconPixmapHint;
+	    hints->flags |= IconPixmapHint;
 	    hints->icon_pixmap = myIcon;
 	    if (myMask) {
 		hints->flags |= IconMaskHint;

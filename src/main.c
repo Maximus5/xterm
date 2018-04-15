@@ -1,4 +1,4 @@
-/* $XTermId: main.c,v 1.688 2012/10/14 18:55:00 tom Exp $ */
+/* $XTermId: main.c,v 1.689 2012/11/19 10:33:33 tom Exp $ */
 
 /*
  * Copyright 2002-2011,2012 by Thomas E. Dickey
@@ -1521,26 +1521,31 @@ parseArg(int *num, char **argv, char **valuep)
 
     *valuep = 0;
     if (atbest >= 0) {
-	if (!exact && ambiguous1 >= 0 && ambiguous2 >= 0) {
-	    xtermWarning(
-			    "ambiguous option \"%s\" vs \"%s\"\n",
-			    ITEM(ambiguous1)->option,
-			    ITEM(ambiguous2)->option);
-	}
 	result = ITEM(atbest);
-	TRACE(("...result %s\n", result->option));
-	/* expand abbreviations */
-	if (result->argKind != XrmoptionStickyArg
-	    && strcmp(argv[*num], x_strdup(result->option))) {
-	    argv[*num] = x_strdup(result->option);
+	if (!exact) {
+	    if (ambiguous1 >= 0 && ambiguous2 >= 0) {
+		xtermWarning("ambiguous option \"%s\" vs \"%s\"\n",
+			     ITEM(ambiguous1)->option,
+			     ITEM(ambiguous2)->option);
+	    } else if (strlen(option) > strlen(result->option)) {
+		result = 0;
+	    }
 	}
+	if (result != 0) {
+	    TRACE(("...result %s\n", result->option));
+	    /* expand abbreviations */
+	    if (result->argKind != XrmoptionStickyArg
+		&& strcmp(argv[*num], x_strdup(result->option))) {
+		argv[*num] = x_strdup(result->option);
+	    }
 
-	/* adjust (*num) to skip option value */
-	(*num) += countArg(result);
-	TRACE(("...next %s\n", NonNull(argv[*num])));
-	if (result->argKind == XrmoptionSkipArg) {
-	    *valuep = argv[*num];
-	    TRACE(("...parameter %s\n", NonNull(*valuep)));
+	    /* adjust (*num) to skip option value */
+	    (*num) += countArg(result);
+	    TRACE(("...next %s\n", NonNull(argv[*num])));
+	    if (result->argKind == XrmoptionSkipArg) {
+		*valuep = argv[*num];
+		TRACE(("...parameter %s\n", NonNull(*valuep)));
+	    }
 	}
     }
 #undef ITEM
